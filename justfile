@@ -2,7 +2,8 @@ bin_name := "codeme"
 changelog := "CHANGELOG.md"
 version_file := "VERSION"
 commit := `git rev-parse --short HEAD 2>/dev/null`
-version := `cat VERSION 2>/dev/null || echo "0.0.1"`
+# Use git describe for version: if on tag, shows tag; if after tag, shows "v0.1.0-3-gabcd1234"; if no tags, shows "dev-abcd1234"
+version := `git describe --tags --match "v*" 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)"`
 build_time := `date -u +"%Y-%m-%dT%H:%M:%SZ"`
 
 # Display all commands
