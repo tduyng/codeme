@@ -1,0 +1,22 @@
+version: '2'
+linters:
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - staticcheck
+    - unused
+    - wastedassign
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
