@@ -108,9 +108,12 @@ func OpenDB() (*sql.DB, error) {
 }
 
 func SaveHeartbeat(db *sql.DB, hb Heartbeat) error {
+	// Format timestamp as RFC3339 for proper SQLite DATETIME storage
+	timestampStr := hb.Timestamp.Format(time.RFC3339)
+
 	_, err := db.Exec(`
 		INSERT INTO heartbeats (timestamp, file, language, project, branch, lines, lines_changed, lines_total)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, hb.Timestamp, hb.File, hb.Language, hb.Project, hb.Branch, hb.Lines, hb.LinesChanged, hb.LinesTotal)
+	`, timestampStr, hb.File, hb.Language, hb.Project, hb.Branch, hb.Lines, hb.LinesChanged, hb.LinesTotal)
 	return err
 }

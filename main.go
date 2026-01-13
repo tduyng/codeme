@@ -134,18 +134,35 @@ func handleStats(args []string) {
 }
 
 func handleToday() {
-	db, _ := core.OpenDB()
+	db, err := core.OpenDB()
+	if err != nil {
+		fmt.Printf("Error opening database: %v\n", err)
+		os.Exit(1)
+	}
 	defer db.Close()
 
-	stats, _ := core.CalculateStats(db, true)
+	stats, err := core.CalculateStats(db, true)
+	if err != nil {
+		fmt.Printf("Error calculating stats: %v\n", err)
+		os.Exit(1)
+	}
+
 	printStats(stats)
 }
 
 func handleProjects() {
-	db, _ := core.OpenDB()
+	db, err := core.OpenDB()
+	if err != nil {
+		fmt.Printf("Error opening database: %v\n", err)
+		os.Exit(1)
+	}
 	defer db.Close()
 
-	stats, _ := core.CalculateStats(db, false)
+	stats, err := core.CalculateStats(db, false)
+	if err != nil {
+		fmt.Printf("Error calculating stats: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Println("\nProjects:")
 	fmt.Println("─────────────────────────────────")

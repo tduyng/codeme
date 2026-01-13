@@ -14,12 +14,9 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 		TopFiles:       []FileStat{},
 	}
 
+	// When todayOnly is true, we still need total stats for display
+	// So we first get total stats, then filter today's data
 	query := `SELECT timestamp, file, language, project, lines FROM heartbeats ORDER BY timestamp`
-	if todayOnly {
-		today := time.Now().Format("2006-01-02")
-		query = `SELECT timestamp, file, language, project, lines FROM heartbeats 
-				 WHERE DATE(timestamp) = '` + today + `' ORDER BY timestamp`
-	}
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -31,6 +28,7 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 	var totalSessionTime int64
 	var todaySessionTime int64
 	files := make(map[string]bool)
+	todayFiles := make(map[string]bool)
 	fileStats := make(map[string]*FileStat)
 	projectFiles := make(map[string]map[string]bool)
 	langFiles := make(map[string]map[string]bool)
@@ -44,6 +42,7 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 		rows.Scan(&timestamp, &file, &language, &project, &lines)
 
 		files[file] = true
+		isToday := timestamp.Format("2006-01-02") == today
 
 		// Session detection (15-minute gap)
 		var sessionDelta int64
@@ -51,8 +50,7 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 			sessionDelta = int64(timestamp.Sub(lastTime).Seconds())
 			totalSessionTime += sessionDelta
 
-			date := timestamp.Format("2006-01-02")
-			if date == today {
+			if isToday {
 				todaySessionTime += sessionDelta
 			}
 		}
@@ -102,8 +100,9 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 		stats.HourlyActivity[hour]++
 
 		stats.TotalLines += lines
-		if date == today {
+		if isToday {
 			stats.TodayLines += lines
+			todayFiles[file] = true
 		}
 	}
 
@@ -135,7 +134,121 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 	if todayStat, ok := stats.DailyActivity[today]; ok {
 		stats.Today = todayStat
 	} else {
-		stats.Today = DailyStat{Lines: stats.TodayLines, Time: stats.TodayTime, Files: 0}
+		stats.Today = DailyStat{Lines: stats.TodayLines, Time: stats.TodayTime, Files: len(todayFiles)}
+	}
+
+	// If todayOnly is requested, filter the results to show only today's data
+	if todayOnly {
+		// Keep only today's projects, languages, and files
+		todayProjects := make(map[string]ProjectStat)
+		todayLanguages := make(map[string]LangStat)
+		todayTopFiles := []FileStat{}
+
+		// Filter projects, languages, and files to only today's data
+		// We need to recalculate from today's heartbeats only
+		// Use substr() to handle both RFC3339 and Go default time formats
+		todayQuery := `SELECT timestamp, file, language, project, lines FROM heartbeats 
+				 WHERE substr(timestamp, 1, 10) = '` + today + `' ORDER BY timestamp`
+
+		todayRows, err := db.Query(todayQuery)
+		if err != nil {
+			return stats, err
+		}
+		defer todayRows.Close()
+
+		var todayLastTime time.Time
+		var todayOnlySessionTime int64
+		todayFileStats := make(map[string]*FileStat)
+		todayProjectFiles := make(map[string]map[string]bool)
+		todayLangFiles := make(map[string]map[string]bool)
+		todayOnlyFiles := make(map[string]bool)
+		todayTotalLines := 0
+
+		for todayRows.Next() {
+			var timestamp time.Time
+			var file, language, project string
+			var lines int
+
+			todayRows.Scan(&timestamp, &file, &language, &project, &lines)
+
+			todayOnlyFiles[file] = true
+
+			// Session detection for today only
+			var sessionDelta int64
+			if !todayLastTime.IsZero() && timestamp.Sub(todayLastTime).Minutes() <= 15 {
+				sessionDelta = int64(timestamp.Sub(todayLastTime).Seconds())
+				todayOnlySessionTime += sessionDelta
+			}
+			todayLastTime = timestamp
+
+			// Track files per project (today only)
+			if todayProjectFiles[project] == nil {
+				todayProjectFiles[project] = make(map[string]bool)
+			}
+			todayProjectFiles[project][file] = true
+
+			// Track files per language (today only)
+			if todayLangFiles[language] == nil {
+				todayLangFiles[language] = make(map[string]bool)
+			}
+			todayLangFiles[language][file] = true
+
+			// Aggregate by project (today only)
+			ps := todayProjects[project]
+			ps.Lines += lines
+			ps.Time += sessionDelta
+			todayProjects[project] = ps
+
+			// Aggregate by language (today only)
+			ls := todayLanguages[language]
+			ls.Lines += lines
+			ls.Time += sessionDelta
+			todayLanguages[language] = ls
+
+			// Track top files (today only)
+			if todayFileStats[file] == nil {
+				todayFileStats[file] = &FileStat{Path: file}
+			}
+			todayFileStats[file].Lines += lines
+			todayFileStats[file].Time += sessionDelta
+
+			todayTotalLines += lines
+		}
+
+		// Add file counts (today only)
+		for project, ps := range todayProjects {
+			ps.Files = len(todayProjectFiles[project])
+			todayProjects[project] = ps
+		}
+		for lang, ls := range todayLanguages {
+			ls.Files = len(todayLangFiles[lang])
+			todayLanguages[lang] = ls
+		}
+
+		// Get top files (today only)
+		for _, fs := range todayFileStats {
+			todayTopFiles = append(todayTopFiles, *fs)
+		}
+		if len(todayTopFiles) > 10 {
+			todayTopFiles = todayTopFiles[:10]
+		}
+
+		// Replace stats with today-only data
+		stats.Projects = todayProjects
+		stats.Languages = todayLanguages
+		stats.TopFiles = todayTopFiles
+		stats.TotalTime = todayOnlySessionTime
+		stats.TotalLines = todayTotalLines
+		stats.TotalFiles = len(todayOnlyFiles)
+		stats.TodayTime = todayOnlySessionTime
+		stats.TodayLines = todayTotalLines
+
+		// For today-only, streak should be 1 if there's activity, 0 if not
+		if todayTotalLines > 0 {
+			stats.Streak = 1
+		} else {
+			stats.Streak = 0
+		}
 	}
 
 	return stats, nil
