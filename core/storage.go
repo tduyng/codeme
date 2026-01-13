@@ -70,8 +70,19 @@ func MigrateSchema(db *sql.DB) error {
 }
 
 func OpenDB() (*sql.DB, error) {
-	home, _ := os.UserHomeDir()
-	dbPath := filepath.Join(home, ".local", "share", "codeme", "codeme.db")
+	return OpenDBWithPath("")
+}
+
+// OpenDBWithPath opens a database at the specified path, or uses default if empty
+func OpenDBWithPath(customPath string) (*sql.DB, error) {
+	var dbPath string
+
+	if customPath != "" {
+		dbPath = customPath
+	} else {
+		home, _ := os.UserHomeDir()
+		dbPath = filepath.Join(home, ".local", "share", "codeme", "codeme.db")
+	}
 
 	os.MkdirAll(filepath.Dir(dbPath), 0755)
 

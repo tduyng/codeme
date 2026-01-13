@@ -7,14 +7,8 @@ import (
 
 func TestEndToEnd(t *testing.T) {
 	// Create test database
-	db, err := OpenDB()
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := setupTestDB(t)
 	defer db.Close()
-
-	// Clear any existing data
-	db.Exec("DELETE FROM heartbeats")
 
 	// Simulate a coding session
 	session := []struct {
@@ -106,20 +100,11 @@ func TestEndToEnd(t *testing.T) {
 	if stats.TodayLines != expectedTotalLines {
 		t.Errorf("TodayLines = %d, want %d", stats.TodayLines, expectedTotalLines)
 	}
-
-	// Clean up
-	db.Exec("DELETE FROM heartbeats")
 }
 
 func TestMultipleDayStats(t *testing.T) {
-	db, err := OpenDB()
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := setupTestDB(t)
 	defer db.Close()
-
-	// Clear any existing data
-	db.Exec("DELETE FROM heartbeats")
 
 	// Simulate activity over 3 consecutive days
 	now := time.Now()
@@ -176,7 +161,4 @@ func TestMultipleDayStats(t *testing.T) {
 	if len(stats.DailyActivity) != 3 {
 		t.Errorf("DailyActivity count = %d, want 3", len(stats.DailyActivity))
 	}
-
-	// Clean up
-	db.Exec("DELETE FROM heartbeats")
 }

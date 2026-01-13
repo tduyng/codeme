@@ -5,14 +5,8 @@ import (
 )
 
 func TestTrack(t *testing.T) {
-	db, err := OpenDB()
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := setupTestDB(t)
 	defer db.Close()
-
-	// Clear existing data
-	db.Exec("DELETE FROM heartbeats")
 
 	tests := []struct {
 		name         string
@@ -77,23 +71,14 @@ func TestTrack(t *testing.T) {
 			}
 		})
 	}
-
-	// Clean up
-	db.Exec("DELETE FROM heartbeats")
 }
 
 func TestTrackWithChangedLines(t *testing.T) {
-	db, err := OpenDB()
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := setupTestDB(t)
 	defer db.Close()
 
-	// Clear existing data
-	db.Exec("DELETE FROM heartbeats")
-
 	// Track initial file
-	err = Track(db, "/test/evolving.go", "Go", 100, 100)
+	err := Track(db, "/test/evolving.go", "Go", 100, 100)
 	if err != nil {
 		t.Fatalf("First Track() error = %v", err)
 	}
@@ -122,7 +107,4 @@ func TestTrackWithChangedLines(t *testing.T) {
 	if linesTotal != 110 {
 		t.Errorf("lines_total = %d, want 110", linesTotal)
 	}
-
-	// Clean up
-	db.Exec("DELETE FROM heartbeats")
 }

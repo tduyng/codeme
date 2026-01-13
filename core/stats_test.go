@@ -101,14 +101,8 @@ func TestCalculateLongestStreak(t *testing.T) {
 
 func TestCalculateStats(t *testing.T) {
 	// Create test database
-	db, err := OpenDB()
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := setupTestDB(t)
 	defer db.Close()
-
-	// Clear any existing data
-	db.Exec("DELETE FROM heartbeats")
 
 	// Insert test data
 	now := time.Now()
@@ -188,7 +182,4 @@ func TestCalculateStats(t *testing.T) {
 	if stats.TotalTime < expectedTime-tolerance || stats.TotalTime > expectedTime+tolerance {
 		t.Errorf("TotalTime = %d, want ~%d (±%d)", stats.TotalTime, expectedTime, tolerance)
 	}
-
-	// Clean up
-	db.Exec("DELETE FROM heartbeats")
 }
