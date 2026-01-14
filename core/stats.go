@@ -143,6 +143,7 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 		todayProjects := make(map[string]ProjectStat)
 		todayLanguages := make(map[string]LangStat)
 		todayTopFiles := []FileStat{}
+		todayHourlyActivity := make(map[int]int)
 
 		// Filter projects, languages, and files to only today's data
 		// We need to recalculate from today's heartbeats only
@@ -212,6 +213,10 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 			todayFileStats[file].Lines += lines
 			todayFileStats[file].Time += sessionDelta
 
+			// Hourly activity (today only)
+			hour := timestamp.Hour()
+			todayHourlyActivity[hour]++
+
 			todayTotalLines += lines
 		}
 
@@ -237,6 +242,7 @@ func CalculateStats(db *sql.DB, todayOnly bool) (Stats, error) {
 		stats.Projects = todayProjects
 		stats.Languages = todayLanguages
 		stats.TopFiles = todayTopFiles
+		stats.HourlyActivity = todayHourlyActivity
 		stats.TotalTime = todayOnlySessionTime
 		stats.TotalLines = todayTotalLines
 		stats.TotalFiles = len(todayOnlyFiles)
