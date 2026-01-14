@@ -23,19 +23,85 @@ type Heartbeat struct {
 }
 
 type Stats struct {
-	TotalTime      int64                  `json:"total_time"`
-	TotalLines     int                    `json:"total_lines"`
-	TotalFiles     int                    `json:"total_files"`
-	TodayTime      int64                  `json:"today_time"`
-	TodayLines     int                    `json:"today_lines"`
-	Today          DailyStat              `json:"today"` // For nvim plugin compatibility
+	// Total stats (all-time)
+	TotalTime  int64 `json:"total_time"`
+	TotalLines int   `json:"total_lines"`
+	TotalFiles int   `json:"total_files"`
+
+	// Today stats
+	TodayTime  int64     `json:"today_time"`
+	TodayLines int       `json:"today_lines"`
+	TodayFiles int       `json:"today_files"`
+	Today      DailyStat `json:"today"` // For nvim plugin compatibility
+
+	// Yesterday stats (for comparison)
+	YesterdayTime  int64 `json:"yesterday_time"`
+	YesterdayLines int   `json:"yesterday_lines"`
+	YesterdayFiles int   `json:"yesterday_files"`
+
+	// This week stats (Mon-Sun)
+	WeekTime  int64 `json:"week_time"`
+	WeekLines int   `json:"week_lines"`
+	WeekFiles int   `json:"week_files"`
+
+	// Last week stats (for comparison)
+	LastWeekTime  int64 `json:"last_week_time"`
+	LastWeekLines int   `json:"last_week_lines"`
+	LastWeekFiles int   `json:"last_week_files"`
+
+	// This month stats
+	MonthTime  int64 `json:"month_time"`
+	MonthLines int   `json:"month_lines"`
+	MonthFiles int   `json:"month_files"`
+
+	// Peak activity insights
+	MostActiveHour    int    `json:"most_active_hour"`     // 0-23
+	MostActiveDay     string `json:"most_active_day"`      // "Monday", "Tuesday", etc.
+	MostActiveDayTime int64  `json:"most_active_day_time"` // Time spent on most active day
+
+	// Aggregated data
 	Projects       map[string]ProjectStat `json:"projects"`
 	Languages      map[string]LangStat    `json:"languages"`
 	TopFiles       []FileStat             `json:"top_files"`
 	DailyActivity  map[string]DailyStat   `json:"daily_activity"`
 	HourlyActivity map[int]int            `json:"hourly_activity"`
-	Streak         int                    `json:"streak"`
-	LongestStreak  int                    `json:"longest_streak"`
+
+	// Weekly heatmap (last 12 weeks, for GitHub-style contribution grid)
+	// Keys are dates in "2006-01-02" format, values are activity levels 0-4
+	WeeklyHeatmap []HeatmapDay `json:"weekly_heatmap"`
+
+	// Session history (today's sessions)
+	Sessions []Session `json:"sessions"`
+
+	// Streaks
+	Streak        int `json:"streak"`
+	LongestStreak int `json:"longest_streak"`
+
+	// Achievements
+	Achievements []Achievement `json:"achievements"`
+}
+
+type HeatmapDay struct {
+	Date  string `json:"date"`
+	Level int    `json:"level"` // 0-4 (none, low, medium, high, max)
+	Lines int    `json:"lines"`
+	Time  int64  `json:"time"`
+}
+
+type Session struct {
+	Start    string `json:"start"`    // RFC3339 timestamp
+	End      string `json:"end"`      // RFC3339 timestamp
+	Duration int64  `json:"duration"` // seconds
+	Project  string `json:"project"`
+}
+
+type Achievement struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Icon        string `json:"icon"`
+	Unlocked    bool   `json:"unlocked"`
+	UnlockedAt  string `json:"unlocked_at,omitempty"` // RFC3339 timestamp
 }
 
 type ProjectStat struct {
