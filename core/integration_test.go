@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/tduyng/codeme/core/stats"
 	"testing"
 	"time"
 )
@@ -43,7 +44,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	// Calculate stats
-	stats, err := CalculateStats(db, false)
+	stats, err := stats.CalculateStats(db, false)
 	if err != nil {
 		t.Fatalf("CalculateStats() error = %v", err)
 	}
@@ -137,7 +138,7 @@ func TestMultipleDayStats(t *testing.T) {
 	}
 
 	// Calculate stats
-	stats, err := CalculateStats(db, false)
+	stats, err := stats.CalculateStats(db, false)
 	if err != nil {
 		t.Fatalf("CalculateStats() error = %v", err)
 	}

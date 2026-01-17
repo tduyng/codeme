@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/tduyng/codeme/core"
+	"github.com/tduyng/codeme/core/stats"
 )
 
 var (
@@ -120,16 +121,16 @@ func handleStats(args []string) {
 	}
 	defer db.Close()
 
-	stats, err := core.CalculateStats(db, *todayOnly)
+	calStats, err := stats.CalculateStats(db, *todayOnly)
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)
 		os.Exit(1)
 	}
 
 	if *asJSON {
-		json.NewEncoder(os.Stdout).Encode(stats)
+		json.NewEncoder(os.Stdout).Encode(calStats)
 	} else {
-		printStats(stats)
+		printStats(calStats)
 	}
 }
 
@@ -141,13 +142,13 @@ func handleToday() {
 	}
 	defer db.Close()
 
-	stats, err := core.CalculateStats(db, true)
+	calStats, err := stats.CalculateStats(db, true)
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)
 		os.Exit(1)
 	}
 
-	printStats(stats)
+	printStats(calStats)
 }
 
 func handleProjects() {
@@ -158,7 +159,7 @@ func handleProjects() {
 	}
 	defer db.Close()
 
-	stats, err := core.CalculateStats(db, false)
+	calStats, err := stats.CalculateStats(db, false)
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)
 		os.Exit(1)
@@ -166,12 +167,12 @@ func handleProjects() {
 
 	fmt.Println("\nProjects:")
 	fmt.Println("─────────────────────────────────")
-	for project, ps := range stats.Projects {
+	for project, ps := range calStats.Projects {
 		fmt.Printf("  %-20s %s (%d lines)\n", project, formatTime(ps.Time), ps.Lines)
 	}
 }
 
-func printStats(stats core.Stats) {
+func printStats(stats stats.Stats) {
 	fmt.Println("\n╭────────────────────────────────────╮")
 	fmt.Println("│         CodeMe Statistics          │")
 	fmt.Println("╰────────────────────────────────────╯")

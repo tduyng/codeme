@@ -4,7 +4,6 @@ linters:
   enable:
     - govet
     - ineffassign
-    - lll
     - makezero
     - misspell
     - staticcheck
@@ -19,4 +18,3 @@ formatters:
     paths:
       - third_party$
       - builtin$
-      - examples$
