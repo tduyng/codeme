@@ -1,5 +1,17 @@
 package stats
 
+// AchievementConfig defines achievement criteria
+type AchievementConfig struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Type        string `json:"type"` // "streak", "lines", "hours", "languages", "habit", "session"
+	Threshold   int    `json:"threshold,omitempty"`
+	Icon        string `json:"icon"`
+	Hours       []int  `json:"hours,omitempty"`       // For habit type
+	MinSession  int    `json:"min_session,omitempty"` // For session type (seconds)
+}
+
 // AchievementConfigs defines all available achievements
 var AchievementConfigs = []AchievementConfig{
 	// streaks
@@ -23,7 +35,7 @@ var AchievementConfigs = []AchievementConfig{
 	{ID: "hours_100000", Name: "100K h Powerhouse", Description: "Code for 100000 hours total", Type: "hours", Threshold: 360000000, Icon: "💡"},
 
 	// Languages
-	{ID: "polyglot_2", Name: "Bilingual", Description: "Code in 5 different languages", Type: "languages", Threshold: 2, Icon: "🚀"},
+	{ID: "polyglot_2", Name: "Bilingual", Description: "Code in 2 different languages", Type: "languages", Threshold: 2, Icon: "🚀"},
 	{ID: "polyglot_5", Name: "Polyglot", Description: "Code in 5 different languages", Type: "languages", Threshold: 5, Icon: "🌍"},
 	{ID: "polyglot_10", Name: "Polyglot Master", Description: "Code in 10 different languages", Type: "languages", Threshold: 10, Icon: "🧠"},
 	{ID: "polyglot_15", Name: "Code Polymath", Description: "Code in 15 different languages", Type: "languages", Threshold: 15, Icon: "🎓"},
@@ -38,32 +50,45 @@ var AchievementConfigs = []AchievementConfig{
 	{ID: "session_8h", Name: "8h Deep Zone", Description: "Code for 8+ hours in a single session", Type: "session", MinSession: 28800, Icon: "🧠"},
 }
 
-// CalculateAchievements determines which achievements are unlocked
-func CalculateAchievements(stats Stats) []Achievement {
+// CalculateAchievements determines which achievements are unlocked based on stats and activities
+func CalculateAchievements(periodStats PeriodStats, streakInfo StreakInfo) []Achievement {
 	var achievements []Achievement
+
+	// Count unique languages (only code languages)
+	langCount := 0
+	for _, lang := range periodStats.Languages {
+		if IsCodeLanguage(lang.Name) {
+			langCount++
+		}
+	}
 
 	for _, cfg := range AchievementConfigs {
 		unlocked := false
 
 		switch cfg.Type {
 		case "streak":
-			unlocked = stats.Streak >= cfg.Threshold || stats.LongestStreak >= cfg.Threshold
+			unlocked = streakInfo.Current >= cfg.Threshold || streakInfo.Longest >= cfg.Threshold
+
 		case "lines":
-			unlocked = stats.TotalLines >= cfg.Threshold
+			unlocked = periodStats.TotalLines >= cfg.Threshold
+
 		case "hours":
-			unlocked = stats.TotalTime >= int64(cfg.Threshold)
+			unlocked = periodStats.TotalTime >= float64(cfg.Threshold)
+
 		case "languages":
-			unlocked = len(stats.ProgrammingLanguages) >= cfg.Threshold
+			unlocked = langCount >= cfg.Threshold
+
 		case "habit":
 			for _, h := range cfg.Hours {
-				if stats.HourlyActivity[h] > 0 {
+				if h < len(periodStats.Hourly) && periodStats.Hourly[h].Duration > 0 {
 					unlocked = true
 					break
 				}
 			}
+
 		case "session":
-			for _, s := range stats.Sessions {
-				if s.Duration >= int64(cfg.MinSession) {
+			for _, s := range periodStats.Sessions {
+				if s.Duration >= float64(cfg.MinSession) {
 					unlocked = true
 					break
 				}

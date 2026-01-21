@@ -1,37 +1,132 @@
+// core/stats/session.go
 package stats
 
 import (
+	"sort"
 	"time"
+
+	"github.com/tduyng/codeme/util"
 )
 
-const SessionGapMinutes = 15
-
-// DetectSessionGap returns true if timestamps are within session threshold
-func DetectSessionGap(prev, current time.Time) bool {
-	return !prev.IsZero() && current.Sub(prev).Minutes() <= SessionGapMinutes
+// SessionManager handles coding session logic
+type SessionManager struct {
+	timeout     time.Duration
+	minDuration time.Duration
 }
 
-// CalculateAvgSessionLength computes average session duration
-func CalculateAvgSessionLength(sessions []Session) int64 {
-	if len(sessions) == 0 {
-		return 0
+// NewSessionManager creates a new session manager
+func NewSessionManager(timeout, minDuration time.Duration) *SessionManager {
+	if timeout == 0 {
+		timeout = 15 * time.Minute
 	}
-
-	total := int64(0)
-	for _, session := range sessions {
-		total += session.Duration
+	if minDuration == 0 {
+		minDuration = 1 * time.Minute
 	}
-
-	return total / int64(len(sessions))
+	return &SessionManager{
+		timeout:     timeout,
+		minDuration: minDuration,
+	}
 }
 
-// CalculateSessionBreaks adds break duration between sessions
-func CalculateSessionBreaks(sessions []Session) []Session {
-	for i := 1; i < len(sessions); i++ {
-		prevEnd, _ := time.Parse(time.RFC3339, sessions[i-1].End)
-		currentStart, _ := time.Parse(time.RFC3339, sessions[i].Start)
-		breakDuration := int64(currentStart.Sub(prevEnd).Seconds())
-		sessions[i-1].BreakAfter = breakDuration
+// ShouldStartNewSession determines if a new session should be started
+func (sm *SessionManager) ShouldStartNewSession(lastActivity time.Time, currentTime time.Time) bool {
+	return currentTime.Sub(lastActivity) > sm.timeout
+}
+
+// IsValidSession checks if a session meets minimum requirements
+func (sm *SessionManager) IsValidSession(session Session) bool {
+	return session.Duration >= sm.minDuration.Seconds()
+}
+
+// GroupActivitiesIntoSessions groups activities into sessions
+func (sm *SessionManager) GroupActivitiesIntoSessions(activities []Activity) []Session {
+	if len(activities) == 0 {
+		return nil
 	}
+
+	// Sort chronologically
+	sorted := make([]Activity, len(activities))
+	copy(sorted, activities)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Timestamp.Before(sorted[j].Timestamp)
+	})
+
+	var sessions []Session
+	var current *Session
+	var projects, languages util.StringSet
+
+	start := func(a Activity) {
+		projects = util.NewStringSet()
+		languages = util.NewStringSet()
+		projects.Add(a.Project)
+		if IsValidLanguage(a.Language) {
+			languages.Add(NormalizeLanguage(a.Language))
+		}
+
+		current = &Session{
+			ID:         a.ID,
+			StartTime:  a.Timestamp,
+			EndTime:    a.Timestamp,
+			Activities: []Activity{a},
+			IsActive:   false,
+		}
+	}
+
+	finalize := func() {
+		// CRITICAL: Session duration = sum of activity durations (not time span!)
+		sessionDuration := 0.0
+		for _, act := range current.Activities {
+			sessionDuration += act.Duration
+		}
+		current.Duration = sessionDuration
+
+		// Set end time to last activity timestamp (not extended)
+		if len(current.Activities) > 0 {
+			current.EndTime = current.Activities[len(current.Activities)-1].Timestamp
+		}
+
+		// Populate projects and languages
+		current.Projects = projects.ToSortedSlice()
+		current.Languages = languages.ToSortedSlice()
+
+		if sm.IsValidSession(*current) {
+			sessions = append(sessions, *current)
+		}
+	}
+
+	for _, a := range sorted {
+		if current == nil {
+			start(a)
+			continue
+		}
+
+		if a.Timestamp.Sub(current.EndTime) > sm.timeout {
+			// Gap too large - finalize current session and start new one
+			finalize()
+			start(a)
+			continue
+		}
+
+		// Continue current session
+		current.Activities = append(current.Activities, a)
+		current.EndTime = a.Timestamp
+		projects.Add(a.Project)
+		if IsValidLanguage(a.Language) {
+			languages.Add(NormalizeLanguage(a.Language))
+		}
+	}
+
+	// Finalize last session
+	if current != nil {
+		finalize()
+	}
+
+	// Calculate breaks between sessions
+	for i := 0; i < len(sessions)-1; i++ {
+		sessions[i].BreakAfter = sessions[i+1].StartTime.Sub(
+			sessions[i].EndTime,
+		).Seconds()
+	}
+
 	return sessions
 }

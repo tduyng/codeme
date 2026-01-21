@@ -2,17 +2,38 @@ package stats
 
 import "time"
 
+// GetDailySummary creates daily summary from activities
+func GetDailySummary(activities []Activity) map[string]DailyStat {
+	daily := make(map[string]DailyStat)
+
+	for _, a := range activities {
+		date := a.Timestamp.Format("2006-01-02")
+		stat := daily[date]
+		stat.Date = date
+		stat.Time += int64(a.Duration)
+		stat.Lines += a.Lines
+		stat.Files++
+		daily[date] = stat
+	}
+
+	return daily
+}
+
 // GenerateWeeklyHeatmap creates a heatmap for the last N weeks
-func GenerateWeeklyHeatmap(daily map[string]DailyStat, weeks int) []HeatmapDay {
+func GenerateWeeklyHeatmap(activities []Activity, weeks int) []HeatmapDay {
+	// Create daily summary
+	daily := GetDailySummary(activities)
+
 	// Find max activity for level calculation
-	var maxLines int
+	maxDuration := 0.0
 	for _, ds := range daily {
-		if ds.Lines > maxLines {
-			maxLines = ds.Lines
+		duration := float64(ds.Time)
+		if duration > maxDuration {
+			maxDuration = duration
 		}
 	}
 
-	// Calculate start date aligned to Monday
+	// Calculate date range aligned to weeks (Monday-Sunday)
 	now := time.Now()
 	weekday := int(now.Weekday())
 	if weekday == 0 {
@@ -30,15 +51,16 @@ func GenerateWeeklyHeatmap(daily map[string]DailyStat, weeks int) []HeatmapDay {
 	heatmap := make([]HeatmapDay, totalDays)
 
 	// Generate heatmap starting from Monday of first week
-	for i := 0; i < totalDays; i++ {
+	for i := range totalDays {
 		d := startDate.AddDate(0, 0, i)
 		date := d.Format("2006-01-02")
 		ds := daily[date]
 
 		// Calculate level (0-4)
 		level := 0
-		if maxLines > 0 && ds.Lines > 0 {
-			ratio := float64(ds.Lines) / float64(maxLines)
+		duration := float64(ds.Time)
+		if maxDuration > 0 && duration > 0 {
+			ratio := duration / maxDuration
 			if ratio > 0.75 {
 				level = 4
 			} else if ratio > 0.5 {

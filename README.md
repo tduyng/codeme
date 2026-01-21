@@ -108,6 +108,19 @@ just test
 go run . stats
 ```
 
+### Debug from database
+```bash
+# Check if activities exist
+sqlite3 ~/.local/share/codeme/codeme.db "SELECT COUNT(*) FROM activities;"
+
+# If > 0, check API output
+codeme api | jq '.this_week.total_time'
+
+# If 0, use debug version
+# Replace bridge.go with debug_bridge artifact
+go build && ./codeme api 2>&1 | grep DEBUG
+```
+
 ### Integration with Editors
 
 #### Neovim

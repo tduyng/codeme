@@ -187,25 +187,21 @@ var LanguageClassification = map[string]string{
 	"ninja":     "meta",
 }
 
-// CalculateProficiency returns proficiency level based on hours
-func CalculateProficiency(hoursTotal int) string {
-	if hoursTotal >= 2000 {
+func CalculateProficiency(hours float64) string {
+	switch {
+	case hours >= 10000:
 		return "Master"
-	} else if hoursTotal >= 1000 {
+	case hours >= 5000:
 		return "Expert"
-	} else if hoursTotal >= 500 {
+	case hours >= 1000:
 		return "Advanced"
-	} else if hoursTotal >= 200 {
+	case hours >= 500:
 		return "Intermediate"
-	} else if hoursTotal >= 50 {
+	case hours >= 50:
 		return "Beginner+"
+	default:
+		return "Beginner"
 	}
-	return "Beginner"
-}
-
-// IsTrending checks if language is growing
-func IsTrending(growth string) bool {
-	return strings.Contains(growth, "↗") || strings.Contains(growth, "+")
 }
 
 // IsCodeLanguage checks if language should count as programming
@@ -214,4 +210,25 @@ func IsCodeLanguage(lang string) bool {
 	lower = strings.ReplaceAll(lower, ".", "")
 	kind, ok := LanguageClassification[lower]
 	return ok && kind == "code"
+}
+
+var invalidLanguages = map[string]struct{}{
+	"":          {},
+	"n/a":       {},
+	"na":        {},
+	"unknown":   {},
+	"undefined": {},
+	"null":      {},
+	"none":      {},
+	"None":      {},
+}
+
+func IsValidLanguage(lang string) bool {
+	lang = strings.TrimSpace(strings.ToLower(lang))
+	_, invalid := invalidLanguages[lang]
+	return !invalid
+}
+
+func NormalizeLanguage(lang string) string {
+	return strings.TrimSpace(strings.ToLower(lang))
 }
