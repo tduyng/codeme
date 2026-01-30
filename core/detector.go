@@ -1,3 +1,4 @@
+// core/detector.go
 package core
 
 import (
@@ -5,210 +6,231 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
-func DetectProject(filePath string) string {
-	// Try git root first
-	dir := filepath.Dir(filePath)
+type Detector struct {
+	langCache    sync.Map
+	projectCache sync.Map
+}
+
+func NewDetector() *Detector {
+	return &Detector{}
+}
+
+func (d *Detector) DetectLanguage(path string) string {
+	if cached, ok := d.langCache.Load(path); ok {
+		return cached.(string)
+	}
+
+	ext := strings.TrimPrefix(filepath.Ext(path), ".")
+	lang := languageFromExtension(ext)
+
+	d.langCache.Store(path, lang)
+	return lang
+}
+
+func (d *Detector) DetectProject(path string) string {
+	if cached, ok := d.projectCache.Load(path); ok {
+		return cached.(string)
+	}
+
+	var project string
+
+	dir := filepath.Dir(path)
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	cmd.Dir = dir
+
 	if output, err := cmd.Output(); err == nil {
-		return filepath.Base(strings.TrimSpace(string(output)))
+		project = filepath.Base(strings.TrimSpace(string(output)))
+	} else {
+		abs, _ := filepath.Abs(path)
+		parts := strings.Split(filepath.Dir(abs), string(os.PathSeparator))
+		if len(parts) > 0 {
+			project = parts[len(parts)-1]
+		} else {
+			project = "unknown"
+		}
 	}
 
-	// Fallback to directory name
-	abs, _ := filepath.Abs(filePath)
-	parts := strings.Split(filepath.Dir(abs), string(os.PathSeparator))
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-	return "n/a"
+	d.projectCache.Store(path, project)
+	return project
 }
 
-func DetectLanguage(filePath string) string {
-	ext := strings.TrimPrefix(filepath.Ext(filePath), ".")
-	if lang, ok := langMap[ext]; ok {
-		return lang
+func languageFromExtension(ext string) string {
+	lang, ok := langMap[ext]
+	if !ok {
+		return ext
 	}
-	return ext
-}
-
-func DetectBranch(filePath string) string {
-	dir := filepath.Dir(filePath)
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = dir
-	if output, err := cmd.Output(); err == nil {
-		return strings.TrimSpace(string(output))
-	}
-	return ""
+	return lang
 }
 
 var langMap = map[string]string{
-	"go":                   "Go",
-	"js":                   "JavaScript",
-	"ts":                   "TypeScript",
-	"jsx":                  "JSX",
-	"tsx":                  "TSX",
-	"py":                   "Python",
-	"rb":                   "Ruby",
-	"java":                 "Java",
-	"c":                    "C",
-	"h":                    "C Header",
-	"cpp":                  "C++",
-	"hpp":                  "C++ Header",
-	"cs":                   "C#",
-	"rs":                   "Rust",
-	"php":                  "PHP",
-	"swift":                "Swift",
-	"kt":                   "Kotlin",
-	"lua":                  "Lua",
-	"vim":                  "Vim script",
-	"sh":                   "Shell",
-	"bash":                 "Bash",
-	"zsh":                  "Zsh",
-	"fish":                 "Fish",
-	"md":                   "Markdown",
-	"json":                 "JSON",
-	"yaml":                 "YAML",
-	"yml":                  "YAML",
-	"toml":                 "TOML",
-	"html":                 "HTML",
-	"htm":                  "HTML",
-	"css":                  "CSS",
-	"scss":                 "SCSS",
-	"sass":                 "Sass",
-	"less":                 "Less",
-	"sql":                  "SQL",
-	"mysql":                "MySQL",
-	"psql":                 "PostgreSQL",
-	"plsql":                "PL/SQL",
-	"jl":                   "Julia",
-	"rkt":                  "Racket",
-	"clj":                  "Clojure",
-	"cljs":                 "ClojureScript",
-	"scm":                  "Scheme",
-	"lisp":                 "Lisp",
-	"el":                   "Emacs Lisp",
-	"erl":                  "Erlang",
-	"ex":                   "Elixir",
-	"exs":                  "Elixir",
-	"hs":                   "Haskell",
-	"nim":                  "Nim",
-	"crystal":              "Crystal",
-	"scala":                "Scala",
-	"sbt":                  "SBT",
-	"fs":                   "F#",
-	"fsi":                  "F# Script",
-	"ml":                   "OCaml",
-	"mli":                  "OCaml Interface",
-	"re":                   "Reason",
-	"dart":                 "Dart",
-	"flutter":              "Flutter",
-	"web":                  "WebAssembly",
-	"wat":                  "WAT",
-	"zig":                  "Zig",
-	"v":                    "V",
-	"odin":                 "Odin",
-	"bun":                  "Bun",
-	"deno":                 "Deno",
-	"bunjs":                "Bun JavaScript",
-	"vue":                  "Vue",
-	"svelte":               "Svelte",
-	"svelte-":              "Svelte",
-	"astro":                "Astro",
-	"solid":                "SolidJS",
-	"qml":                  "QML",
-	"rsh":                  "ReScript",
-	"res":                  "ReScript",
-	"elm":                  "Elm",
-	"purs":                 "PureScript",
-	"gleam":                "Gleam",
-	"mojo":                 "Mojo",
-	"vala":                 "Vala",
-	"d":                    "D",
-	"pas":                  "Pascal",
-	"pascal":               "Pascal",
-	"ada":                  "Ada",
-	"fortran":              "Fortran",
-	"77":                   "Fortran 77",
-	"f90":                  "Fortran 90",
-	"asm":                  "Assembly",
-	"s":                    "Assembly",
-	"nasm":                 "NASM",
-	"objdump":              "Object Dump",
-	"bat":                  "Batch",
-	"cmd":                  "CMD",
-	"ps1":                  "PowerShell",
-	"psm1":                 "PowerShell Module",
-	"ahk":                  "AutoHotkey",
-	"applescript":          "AppleScript",
-	"scpt":                 "AppleScript",
-	"tex":                  "LaTeX",
-	"latex":                "LaTeX",
-	"rnoweb":               "Rnoweb",
-	"rtex":                 "R TeX",
-	"xml":                  "XML",
-	"xhtml":                "XHTML",
-	"svg":                  "SVG",
-	"graphql":              "GraphQL",
-	"gql":                  "GraphQL",
-	"proto":                "Protocol Buffers",
-	"thrift":               "Thrift",
-	"capnp":                "Cap'n Proto",
-	"dockerfile":           "Dockerfile",
-	"docker":               "Docker",
-	"dockerignore":         "Docker Ignore",
-	"compose":              "Docker Compose",
-	"editorconfig":         "EditorConfig",
-	"gitignore":            "Gitignore",
-	"gitattributes":        "Git Attributes",
-	"prettierrc":           "Prettier RC",
-	"eslintrc":             "ESLint RC",
-	"tsconfig":             "TSConfig",
-	"jsconfig":             "JSConfig",
-	"package.json":         "Package JSON",
-	"package-lock.json":    "Package Lock",
-	"pnpm-lock.yaml":       "PNPM Lock",
-	"yarn.lock":            "Yarn Lock",
-	"cargotoml":            "Cargo TOML",
-	"cargo.lock":           "Cargo Lock",
-	"composer.json":        "Composer JSON",
-	"pubspec.yaml":         "Pubspec YAML",
-	"build.gradle":         "Gradle",
-	"gradle.properties":    "Gradle Properties",
-	"pom.xml":              "Maven POM",
-	"makefile":             "Makefile",
-	"make":                 "Makefile",
-	"meson.build":          "Meson",
-	"cmake":                "CMake",
-	"ninja":                "Ninja",
-	"vcpkg.json":           "VCPKG",
-	"justfile":             "Justfile",
-	"taskfile.yml":         "Taskfile",
-	"wolfram":              "Wolfram Language",
-	"wl":                   "Wolfram Language",
-	"mathematica":          "Mathematica",
-	"nb":                   "Mathematica Notebook",
-	"ipynb":                "Jupyter Notebook",
-	"rmd":                  "R Markdown",
-	"quarto":               "Quarto",
-	"org":                  "Org-mode",
-	"rst":                  "reStructuredText",
-	"adoc":                 "AsciiDoc",
-	"txt":                  "Plain Text",
-	"log":                  "Log File",
-	"cfg":                  "Config",
-	"conf":                 "Config",
-	"ini":                  "INI",
+	"go":                   "go",
+	"js":                   "javascript",
+	"ts":                   "typescript",
+	"jsx":                  "jsx",
+	"tsx":                  "tsx",
+	"py":                   "python",
+	"rb":                   "ruby",
+	"java":                 "java",
+	"c":                    "c",
+	"h":                    "c header",
+	"cpp":                  "c++",
+	"hpp":                  "c++ header",
+	"cs":                   "c#",
+	"rs":                   "rust",
+	"php":                  "php",
+	"swift":                "swift",
+	"kt":                   "kotlin",
+	"lua":                  "lua",
+	"vim":                  "vim script",
+	"sh":                   "shell",
+	"bash":                 "bash",
+	"zsh":                  "zsh",
+	"fish":                 "fish",
+	"md":                   "markdown",
+	"json":                 "json",
+	"yaml":                 "yaml",
+	"yml":                  "yaml",
+	"toml":                 "toml",
+	"html":                 "html",
+	"htm":                  "html",
+	"css":                  "css",
+	"scss":                 "scss",
+	"sass":                 "sass",
+	"less":                 "less",
+	"sql":                  "sql",
+	"mysql":                "mysql",
+	"psql":                 "postgresql",
+	"plsql":                "pl/sql",
+	"jl":                   "julia",
+	"rkt":                  "racket",
+	"clj":                  "clojure",
+	"cljs":                 "clojurescript",
+	"scm":                  "scheme",
+	"lisp":                 "lisp",
+	"el":                   "emacs lisp",
+	"erl":                  "erlang",
+	"ex":                   "elixir",
+	"exs":                  "elixir",
+	"hs":                   "haskell",
+	"nim":                  "nim",
+	"crystal":              "crystal",
+	"scala":                "scala",
+	"sbt":                  "sbt",
+	"fs":                   "f#",
+	"fsi":                  "f# script",
+	"ml":                   "ocaml",
+	"mli":                  "ocaml interface",
+	"re":                   "reason",
+	"dart":                 "dart",
+	"flutter":              "flutter",
+	"web":                  "webassembly",
+	"wat":                  "wat",
+	"zig":                  "zig",
+	"v":                    "v",
+	"odin":                 "odin",
+	"bun":                  "bun",
+	"deno":                 "deno",
+	"bunjs":                "bun javascript",
+	"vue":                  "vue",
+	"svelte":               "svelte",
+	"svelte-":              "svelte",
+	"astro":                "astro",
+	"solid":                "solidjs",
+	"qml":                  "qml",
+	"rsh":                  "rescript",
+	"res":                  "rescript",
+	"elm":                  "elm",
+	"purs":                 "purescript",
+	"gleam":                "gleam",
+	"mojo":                 "mojo",
+	"vala":                 "vala",
+	"d":                    "d",
+	"pas":                  "pascal",
+	"pascal":               "pascal",
+	"ada":                  "ada",
+	"fortran":              "fortran",
+	"77":                   "fortran 77",
+	"f90":                  "fortran 90",
+	"asm":                  "assembly",
+	"s":                    "assembly",
+	"nasm":                 "nasm",
+	"objdump":              "object dump",
+	"bat":                  "batch",
+	"cmd":                  "cmd",
+	"ps1":                  "powershell",
+	"psm1":                 "powershell module",
+	"ahk":                  "autohotkey",
+	"applescript":          "applescript",
+	"scpt":                 "applescript",
+	"tex":                  "latex",
+	"latex":                "latex",
+	"rnoweb":               "rnoweb",
+	"rtex":                 "r tex",
+	"xml":                  "xml",
+	"xhtml":                "xhtml",
+	"svg":                  "svg",
+	"graphql":              "graphql",
+	"gql":                  "graphql",
+	"proto":                "protocol buffers",
+	"thrift":               "thrift",
+	"capnp":                "cap'n proto",
+	"dockerfile":           "dockerfile",
+	"docker":               "docker",
+	"dockerignore":         "docker ignore",
+	"compose":              "docker compose",
+	"editorconfig":         "editorconfig",
+	"gitignore":            "gitignore",
+	"gitattributes":        "git attributes",
+	"prettierrc":           "prettier rc",
+	"eslintrc":             "eslint rc",
+	"tsconfig":             "tsconfig",
+	"jsconfig":             "jsconfig",
+	"package.json":         "package json",
+	"package-lock.json":    "package lock",
+	"pnpm-lock.yaml":       "pnpm lock",
+	"yarn.lock":            "yarn lock",
+	"cargotoml":            "cargo toml",
+	"cargo.lock":           "cargo lock",
+	"composer.json":        "composer json",
+	"pubspec.yaml":         "pubspec yaml",
+	"build.gradle":         "gradle",
+	"gradle.properties":    "gradle properties",
+	"pom.xml":              "maven pom",
+	"makefile":             "makefile",
+	"make":                 "makefile",
+	"meson.build":          "meson",
+	"cmake":                "cmake",
+	"ninja":                "ninja",
+	"vcpkg.json":           "vcpkg",
+	"justfile":             "justfile",
+	"taskfile.yml":         "taskfile",
+	"wolfram":              "wolfram language",
+	"wl":                   "wolfram language",
+	"mathematica":          "mathematica",
+	"nb":                   "mathematica notebook",
+	"ipynb":                "jupyter notebook",
+	"rmd":                  "r markdown",
+	"quarto":               "quarto",
+	"org":                  "org-mode",
+	"rst":                  "restructuredtext",
+	"adoc":                 "asciidoc",
+	"txt":                  "plain text",
+	"log":                  "log file",
+	"cfg":                  "config",
+	"conf":                 "config",
+	"ini":                  "ini",
 	"env":                  ".env",
-	"graphql.config.json":  "GraphQL Config",
-	"tailwind.config.js":   "Tailwind Config",
-	"next.config.js":       "Next.js Config",
-	"nuxt.config.ts":       "Nuxt Config",
-	"vite.config.ts":       "Vite Config",
-	"rollup.config.js":     "Rollup Config",
-	"webpack.config.js":    "Webpack Config",
-	"jest.config.js":       "Jest Config",
-	"cypress.config.ts":    "Cypress Config",
-	"playwright.config.ts": "Playwright Config",
+	"graphql.config.json":  "graphql config",
+	"tailwind.config.js":   "tailwind config",
+	"next.config.js":       "next.js config",
+	"nuxt.config.ts":       "nuxt config",
+	"vite.config.ts":       "vite config",
+	"rollup.config.js":     "rollup config",
+	"webpack.config.js":    "webpack config",
+	"jest.config.js":       "jest config",
+	"cypress.config.ts":    "cypress config",
+	"playwright.config.ts": "playwright config",
 }

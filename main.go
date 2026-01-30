@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/tduyng/codeme/core"
-	"github.com/tduyng/codeme/core/stats"
+	"github.com/tduyng/codeme/stats"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 	commit    = "unknown"
 )
 
-const LOOKBACK_DAYS = 180
+const LOOKBACK_DAYS = 365
 
 func main() {
 	if len(os.Args) < 2 {
@@ -105,17 +105,10 @@ func handleTrack(args []string) {
 		os.Exit(1)
 	}
 
-	// Detect language only if not provided by client
-	if *lang == "" {
-		*lang = core.DetectLanguage(*file)
-	}
-
-	// Default editor
 	if *editor == "" {
 		*editor = "neovim"
 	}
 
-	// Init storage
 	dbPath, err := core.GetDefaultDBPath()
 	if err != nil {
 		fmt.Printf("Error resolving DB path: %v\n", err)
@@ -129,19 +122,9 @@ func handleTrack(args []string) {
 	}
 	defer storage.Close()
 
-	// Init tracker
-	tracker := core.NewTracker(core.TrackerConfig{
-		Storage: storage,
-	})
+	tracker := core.NewTracker(storage)
 
-	// Track activity
-	if err := tracker.TrackFileActivity(
-		*file,
-		*lang,
-		*editor,
-		*lines,
-		true, // isWrite
-	); err != nil {
+	if err := tracker.TrackFileActivity(*file, *lang, *editor, *lines, true); err != nil {
 		fmt.Printf("Error tracking: %v\n", err)
 		os.Exit(1)
 	}
@@ -149,7 +132,6 @@ func handleTrack(args []string) {
 	fmt.Println("✓ Activity tracked successfully")
 }
 
-// handleStats shows pretty-printed statistics for CLI users
 func handleStats(args []string) {
 	fs := flag.NewFlagSet("stats", flag.ExitOnError)
 	todayOnly := fs.Bool("today", false, "Show only today's stats")
@@ -162,14 +144,15 @@ func handleStats(args []string) {
 	}
 	defer db.Close()
 
-	// Get optimized API stats
-	apiStats, err := stats.GetAPIStats(db)
+	calc := stats.NewCalculator(time.Local)
+	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
+		LoadRecentDays: LOOKBACK_DAYS,
+	})
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Pretty print based on flag
 	if *todayOnly {
 		printTodayStats(apiStats)
 	} else {
@@ -177,7 +160,6 @@ func handleStats(args []string) {
 	}
 }
 
-// handleToday is a convenience command for today's stats
 func handleToday() {
 	db, err := core.OpenDB()
 	if err != nil {
@@ -186,7 +168,10 @@ func handleToday() {
 	}
 	defer db.Close()
 
-	apiStats, err := stats.GetAPIStats(db)
+	calc := stats.NewCalculator(time.Local)
+	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
+		LoadRecentDays: LOOKBACK_DAYS,
+	})
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)
 		os.Exit(1)
@@ -195,7 +180,6 @@ func handleToday() {
 	printTodayStats(apiStats)
 }
 
-// handleProjects shows project breakdown
 func handleProjects() {
 	db, err := core.OpenDB()
 	if err != nil {
@@ -204,7 +188,10 @@ func handleProjects() {
 	}
 	defer db.Close()
 
-	apiStats, err := stats.GetAPIStats(db)
+	calc := stats.NewCalculator(time.Local)
+	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
+		LoadRecentDays: LOOKBACK_DAYS,
+	})
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)
 		os.Exit(1)
@@ -213,7 +200,6 @@ func handleProjects() {
 	printProjectStats(apiStats)
 }
 
-// handleAPI outputs JSON for external consumers (Neovim, web dashboards, etc)
 func handleAPI(args []string) {
 	fs := flag.NewFlagSet("api", flag.ExitOnError)
 	compact := fs.Bool("compact", false, "Output compact JSON (no indentation)")
@@ -227,10 +213,9 @@ func handleAPI(args []string) {
 	}
 	defer db.Close()
 
-	// 🚀 Use optimized API stats with custom time window
-	apiStats, err := stats.GetAPIStatsWithOptions(db, stats.APIStatsOptions{
+	calc := stats.NewCalculator(time.Local)
+	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
 		LoadRecentDays: *days,
-		IncludeAllTime: true,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error calculating stats: %v\n", err)
@@ -248,7 +233,6 @@ func handleAPI(args []string) {
 	}
 }
 
-// handleOptimize performs database maintenance
 func handleOptimize() {
 	fmt.Println("🔧 Optimizing database...")
 
@@ -267,7 +251,6 @@ func handleOptimize() {
 
 	startTime := time.Now()
 
-	// Run VACUUM and ANALYZE
 	if err := storage.Optimize(); err != nil {
 		fmt.Printf("❌ Error optimizing: %v\n", err)
 		os.Exit(1)
@@ -280,7 +263,6 @@ func handleOptimize() {
 	fmt.Println("  • Analyzed query patterns")
 }
 
-// 🚀 NEW: handleInfo shows database statistics
 func handleInfo() {
 	dbPath, err := core.GetDefaultDBPath()
 	if err != nil {
@@ -295,14 +277,12 @@ func handleInfo() {
 	}
 	defer storage.Close()
 
-	// Get activity count
 	count, err := storage.GetActivityCount()
 	if err != nil {
 		fmt.Printf("Error getting activity count: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Get database file size
 	info, err := os.Stat(dbPath)
 	var dbSize int64 = 0
 	if err == nil {
@@ -319,11 +299,6 @@ func handleInfo() {
 	if count > 0 {
 		avgSize := float64(dbSize) / float64(count)
 		fmt.Printf("  📏 Avg per Activity: %.2f KB\n", avgSize/1024)
-	}
-
-	// Estimate days of data
-	if count > 0 {
-		// Rough estimate: 200 activities per day
 		estimatedDays := count / 200
 		fmt.Printf("  📅 Estimated Days: ~%d days\n", estimatedDays)
 	}
@@ -331,10 +306,6 @@ func handleInfo() {
 	fmt.Println("\n  💡 Tip: Run 'codeme optimize' monthly to maintain performance")
 	fmt.Println()
 }
-
-// ============================================================================
-// Pretty Printing Functions
-// ============================================================================
 
 func printTodayStats(s *stats.APIStats) {
 	today := s.Today
@@ -366,11 +337,10 @@ func printTodayStats(s *stats.APIStats) {
 			if i >= 5 {
 				break
 			}
-			fmt.Printf("    %-15s %s %s\n", proj.Name, formatDuration(proj.Time), proj.Growth)
+			fmt.Printf("    %-15s %s\n", proj.Name, formatDuration(proj.Time))
 		}
 	}
 
-	// Daily goals
 	if today.DailyGoals.TimeGoal > 0 {
 		fmt.Println("\n  Daily Goals:")
 		fmt.Printf("    Time:  %.1f%% of %s\n",
@@ -384,7 +354,6 @@ func printTodayStats(s *stats.APIStats) {
 		}
 	}
 
-	// 🚀 NEW: Show performance metadata
 	if s.Meta.QueryTimeMs > 0 {
 		fmt.Printf("\n  ⚡ Query: %.0fms (%d activities)\n", s.Meta.QueryTimeMs, s.Meta.LoadedActivities)
 	}
@@ -397,14 +366,12 @@ func printAllStats(s *stats.APIStats) {
 	fmt.Println("│       CodeMe Statistics            │")
 	fmt.Println("╰────────────────────────────────────╯")
 
-	// Overview
 	fmt.Printf("\n  📊 Overview\n")
 	fmt.Printf("  ─────────────────────────────────\n")
 	fmt.Printf("  Today:      %s (%d lines)\n", formatDuration(s.Today.TotalTime), s.Today.TotalLines)
 	fmt.Printf("  This Week:  %s (%d lines)\n", formatDuration(s.ThisWeek.TotalTime), s.ThisWeek.TotalLines)
 	fmt.Printf("  All Time:   %s (%d lines)\n", formatDuration(s.AllTime.TotalTime), s.AllTime.TotalLines)
 
-	// Streak
 	if s.StreakInfo.Current > 0 {
 		fmt.Printf("\n  🔥 Streak\n")
 		fmt.Printf("  ─────────────────────────────────\n")
@@ -415,7 +382,6 @@ func printAllStats(s *stats.APIStats) {
 		}
 	}
 
-	// Top Languages
 	if len(s.AllTime.Languages) > 0 {
 		fmt.Printf("\n  💬 Top Languages (All Time)\n")
 		fmt.Printf("  ─────────────────────────────────\n")
@@ -431,7 +397,6 @@ func printAllStats(s *stats.APIStats) {
 		}
 	}
 
-	// Top Projects
 	if len(s.AllTime.Projects) > 0 {
 		fmt.Printf("\n  📁 Top Projects (All Time)\n")
 		fmt.Printf("  ─────────────────────────────────\n")
@@ -443,7 +408,6 @@ func printAllStats(s *stats.APIStats) {
 		}
 	}
 
-	// Achievements
 	unlockedCount := 0
 	for _, ach := range s.Achievements {
 		if ach.Unlocked {
@@ -496,7 +460,6 @@ func printProjectStats(s *stats.APIStats) {
 		fmt.Printf("     Lines:    %d\n", proj.Lines)
 		fmt.Printf("     Files:    %d\n", proj.Files)
 		fmt.Printf("     Language: %s\n", proj.MainLanguage)
-		fmt.Printf("     Growth:   %s\n", proj.Growth)
 	}
 	fmt.Println()
 }

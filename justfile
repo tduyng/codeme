@@ -10,9 +10,11 @@ build_time := `date -u +"%Y-%m-%dT%H:%M:%SZ"`
 default:
     @just --list
 
-# Build and install
-install:
+build:
     @go build -ldflags "-X main.version={{ version }} -X main.commit={{ commit }} -X main.buildTime={{ build_time }}" -o {{ bin_name }} .
+
+# Build and install
+install: build
     @mv {{ bin_name }} $(go env GOPATH)/bin
     @echo "✓ Installed {{ bin_name }} {{ version }} to $(go env GOPATH)/bin"
 

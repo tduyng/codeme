@@ -6,53 +6,37 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tduyng/codeme/core/stats"
 )
 
-// Tracker manages activity tracking
 type Tracker struct {
-	storage    Storage
-	calculator *stats.Calculator
+	storage  Storage
+	detector *Detector
 }
 
-// TrackerConfig holds tracker configuration
-type TrackerConfig struct {
-	Storage  Storage
-	Timezone *time.Location
-}
-
-// NewTracker creates a new activity tracker
-func NewTracker(config TrackerConfig) *Tracker {
-	if config.Timezone == nil {
-		config.Timezone = time.UTC
-	}
-
+func NewTracker(storage Storage) *Tracker {
 	return &Tracker{
-		storage:    config.Storage,
-		calculator: stats.NewCalculator(config.Timezone),
+		storage:  storage,
+		detector: NewDetector(),
 	}
 }
 
-// TrackFileActivity records a file edit activity
-// NOTE: We only save activities, not sessions
-// Sessions are calculated on-demand from activities
 func (t *Tracker) TrackFileActivity(filePath, language, editor string, linesChanged int, isWrite bool) error {
 	now := time.Now()
 
-	// Detect language if not provided
-	if language == "" || language == "Unknown" {
-		language = DetectLanguage(filePath)
+	if language == "" || language == "unknown" {
+		language = t.detector.DetectLanguage(filePath)
 	}
 
-	// Detect project
-	project := DetectProject(filePath)
+	project := t.detector.DetectProject(filePath)
 
-	// Create activity WITHOUT duration
-	// Duration will be calculated later from gaps between activities
-	activity := stats.Activity{
+	if editor == "" {
+		editor = "neovim"
+	}
+
+	activity := Activity{
 		ID:        uuid.New().String(),
 		Timestamp: now,
-		Duration:  0, // Will be calculated from gaps in calculator.go
+		Duration:  0,
 		Lines:     linesChanged,
 		Language:  language,
 		Project:   project,
@@ -61,7 +45,6 @@ func (t *Tracker) TrackFileActivity(filePath, language, editor string, linesChan
 		IsWrite:   isWrite,
 	}
 
-	// Save activity only - sessions will be calculated on-demand
 	if err := t.storage.SaveActivity(activity); err != nil {
 		return fmt.Errorf("failed to save activity: %w", err)
 	}
@@ -69,15 +52,6 @@ func (t *Tracker) TrackFileActivity(filePath, language, editor string, linesChan
 	return nil
 }
 
-// Close performs cleanup
 func (t *Tracker) Close() error {
 	return t.storage.Close()
-}
-
-func OpenStorage() (Storage, error) {
-	dbPath, err := GetDefaultDBPath()
-	if err != nil {
-		return nil, err
-	}
-	return NewSQLiteStorage(dbPath)
 }

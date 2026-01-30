@@ -22,24 +22,31 @@ jobs:
 
   test:
     name: Test
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]  # Linux + macOS coverage
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
           go-version: '1.25'
-      - run: go test -v -race ./...
+      - run: go test -v -race ./...        # -race catches data races
 
   build:
     name: Build
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     needs: [lint, test]
     strategy:
       matrix:
+        os: [ubuntu-latest, macos-latest]   # Match test platforms
         arch: [amd64, arm64]
+        exclude:
+          - os: ubuntu-latest
+            arch: arm64                     # Skip Linux arm64 if slow
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
           go-version: '1.25'
-      - run: GOARCH=${{ matrix.arch }} go build -o codeme .
+      - run: GOOS=${{ matrix.os == 'ubuntu-latest' && 'linux' || 'darwin' }} GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -ldflags="-s -w" -o codeme .

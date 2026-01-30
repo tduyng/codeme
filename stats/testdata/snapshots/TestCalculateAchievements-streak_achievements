@@ -1,0 +1,184 @@
+([]stats.Achievement) (len=26) {
+  (stats.Achievement) {
+    ID: (string) (len=8) "streak_5",
+    Name: (string) (len=10) "5-Day Fire",
+    Description: (string) (len=24) "Code for 5 days in a row",
+    Icon: (string) (len=4) "🔥",
+    Unlocked: (bool) true
+  },
+  (stats.Achievement) {
+    ID: (string) (len=9) "streak_30",
+    Name: (string) (len=13) "30-Day Streak",
+    Description: (string) (len=29) "Code consistently for 30 days",
+    Icon: (string) (len=4) "🧨",
+    Unlocked: (bool) true
+  },
+  (stats.Achievement) {
+    ID: (string) (len=9) "streak_90",
+    Name: (string) (len=14) "90-Day Inferno",
+    Description: (string) (len=31) "Maintain a 90-day coding streak",
+    Icon: (string) (len=4) "💥",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "streak_180",
+    Name: (string) (len=13) "180-Day Blaze",
+    Description: (string) (len=29) "Code for 180 consecutive days",
+    Icon: (string) (len=4) "🌋",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "streak_365",
+    Name: (string) (len=21) "365-Day Eternal Flame",
+    Description: (string) (len=34) "Maintain a full year coding streak",
+    Icon: (string) (len=4) "🌞",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "lines_1000",
+    Name: (string) (len=12) "1K Line Wave",
+    Description: (string) (len=25) "Write 1,000 lines of code",
+    Icon: (string) (len=7) "🌧️",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "lines_10000",
+    Name: (string) (len=14) "10K Line Surge",
+    Description: (string) (len=26) "Write 10,000 lines of code",
+    Icon: (string) (len=3) "⚡",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "lines_50000",
+    Name: (string) (len=14) "50K Line Flood",
+    Description: (string) (len=26) "Write 50,000 lines of code",
+    Icon: (string) (len=6) "⛈️",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=12) "lines_100000",
+    Name: (string) (len=15) "100K Line Ocean",
+    Description: (string) (len=27) "Write 100,000 lines of code",
+    Icon: (string) (len=4) "🌊",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=8) "hours_50",
+    Name: (string) (len=9) "50h Spark",
+    Description: (string) (len=23) "Code for 50 hours total",
+    Icon: (string) (len=3) "⚡",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "hours_1000",
+    Name: (string) (len=14) "1K h Lightning",
+    Description: (string) (len=25) "Code for 1000 hours total",
+    Icon: (string) (len=7) "🌩️",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "hours_5000",
+    Name: (string) (len=12) "5K h Thunder",
+    Description: (string) (len=25) "Code for 5000 hours total",
+    Icon: (string) (len=6) "⛈️",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "hours_10000",
+    Name: (string) (len=13) "10K h Mastery",
+    Description: (string) (len=26) "Code for 10000 hours total",
+    Icon: (string) (len=4) "🌀",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "hours_20000",
+    Name: (string) (len=17) "20K h Grandmaster",
+    Description: (string) (len=26) "Code for 20000 hours total",
+    Icon: (string) (len=4) "💡",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "polyglot_2",
+    Name: (string) (len=9) "Bilingual",
+    Description: (string) (len=29) "Code in 2 different languages",
+    Icon: (string) (len=4) "🚀",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "polyglot_5",
+    Name: (string) (len=8) "Polyglot",
+    Description: (string) (len=29) "Code in 5 different languages",
+    Icon: (string) (len=4) "🌍",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "polyglot_10",
+    Name: (string) (len=15) "Polyglot Master",
+    Description: (string) (len=30) "Code in 10 different languages",
+    Icon: (string) (len=4) "🧠",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "polyglot_15",
+    Name: (string) (len=13) "Code Polymath",
+    Description: (string) (len=30) "Code in 15 different languages",
+    Icon: (string) (len=4) "🎓",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "early_bird",
+    Name: (string) (len=10) "Dawn Coder",
+    Description: (string) (len=16) "Code before 6 AM",
+    Icon: (string) (len=4) "🌅",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=9) "night_owl",
+    Name: (string) (len=11) "Night Coder",
+    Description: (string) (len=19) "Code after midnight",
+    Icon: (string) (len=4) "🌌",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "session_2h",
+    Name: (string) (len=10) "2h Warm Up",
+    Description: (string) (len=37) "Code for 2+ hours in a single session",
+    Icon: (string) (len=3) "☕",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "session_4h",
+    Name: (string) (len=8) "4h Focus",
+    Description: (string) (len=37) "Code for 4+ hours in a single session",
+    Icon: (string) (len=4) "🎯",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "session_6h",
+    Name: (string) (len=13) "6h Flow State",
+    Description: (string) (len=37) "Code for 6+ hours in a single session",
+    Icon: (string) (len=4) "🌊",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=10) "session_8h",
+    Name: (string) (len=12) "8h Deep Work",
+    Description: (string) (len=37) "Code for 8+ hours in a single session",
+    Icon: (string) (len=4) "🧠",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "session_10h",
+    Name: (string) (len=13) "10h Monk Mode",
+    Description: (string) (len=38) "Code for 10+ hours in a single session",
+    Icon: (string) (len=13) "🧘\u200d♂️",
+    Unlocked: (bool) false
+  },
+  (stats.Achievement) {
+    ID: (string) (len=11) "session_12h",
+    Name: (string) (len=13) "12h Legendary",
+    Description: (string) (len=38) "Code for 12+ hours in a single session",
+    Icon: (string) (len=4) "👑",
+    Unlocked: (bool) false
+  }
+}
