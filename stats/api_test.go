@@ -412,3 +412,155 @@ func TestCalculator_Performance(t *testing.T) {
 	require.Less(t, duration, 5*time.Second, "calculation should complete in under 5 seconds")
 	require.Greater(t, stats.Meta.QueryTimeMs, 0.0)
 }
+
+func TestCalculator_WeeklyHeatmap_SmartRange(t *testing.T) {
+	// Note: This test uses real time.Now() from the function
+	now := time.Now()
+
+	// Find current week Monday
+	weekday := int(now.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+	daysFromMonday := weekday - 1
+	currentWeekMonday := now.AddDate(0, 0, -daysFromMonday)
+	currentWeekMonday = time.Date(
+		currentWeekMonday.Year(),
+		currentWeekMonday.Month(),
+		currentWeekMonday.Day(),
+		0, 0, 0, 0,
+		currentWeekMonday.Location(),
+	)
+
+	tests := []struct {
+		name               string
+		activityDates      []string // YYYY-MM-DD format
+		minExpectedDays    int      // minimum expected days
+		maxExpectedDays    int      // maximum expected days
+		shouldBeLessThan84 bool     // for new users
+	}{
+		{
+			name: "new user - started this week",
+			activityDates: func() []string {
+				dates := []string{}
+				// Create activities for current week only (Mon-today)
+				for i := 0; i <= daysFromMonday; i++ {
+					date := currentWeekMonday.AddDate(0, 0, i)
+					dates = append(dates, date.Format("2006-01-02"))
+				}
+				return dates
+			}(),
+			minExpectedDays:    7,    // at least current week
+			maxExpectedDays:    14,   // at most 2 weeks
+			shouldBeLessThan84: true, // new user
+		},
+		{
+			name: "user started 2 weeks ago",
+			activityDates: func() []string {
+				dates := []string{}
+				startDate := currentWeekMonday.AddDate(0, 0, -14) // 2 weeks ago
+				for i := 0; i < 14; i++ {                         // 2 weeks of activity
+					if i%2 == 0 { // every other day
+						dates = append(dates, startDate.AddDate(0, 0, i).Format("2006-01-02"))
+					}
+				}
+				return dates
+			}(),
+			minExpectedDays:    14,   // at least 2 weeks
+			maxExpectedDays:    28,   // at most 4 weeks
+			shouldBeLessThan84: true, // new user
+		},
+		{
+			name: "established user - 12+ weeks of activity",
+			activityDates: func() []string {
+				dates := []string{}
+				// Start from 15 weeks ago (beyond 12 week limit)
+				startDate := currentWeekMonday.AddDate(0, 0, -15*7)
+				for i := 0; i < 100; i++ { // 100 days
+					dates = append(dates, startDate.AddDate(0, 0, i).Format("2006-01-02"))
+				}
+				return dates
+			}(),
+			minExpectedDays:    84,    // should be exactly 12 weeks
+			maxExpectedDays:    91,    // allow some variation
+			shouldBeLessThan84: false, // established user
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Build daily stats map
+			daily := make(map[string]DailyStat)
+			for i, dateStr := range tt.activityDates {
+				daily[dateStr] = DailyStat{
+					Date:         dateStr,
+					Time:         int64(3600 + i*100), // varying times
+					Lines:        100 + i*10,
+					Files:        5,
+					SessionCount: 1,
+				}
+			}
+
+			calc := &Calculator{timezone: time.UTC}
+			heatmap := calc.generateWeeklyHeatmap(daily, 12)
+
+			// Verify heatmap is not empty
+			require.Greater(t, len(heatmap), 0, "heatmap should not be empty")
+
+			// Verify length is within expected range
+			require.GreaterOrEqual(t, len(heatmap), tt.minExpectedDays,
+				"heatmap should have at least %d days, got %d", tt.minExpectedDays, len(heatmap))
+			require.LessOrEqual(t, len(heatmap), tt.maxExpectedDays,
+				"heatmap should have at most %d days, got %d", tt.maxExpectedDays, len(heatmap))
+
+			// Verify new user constraint
+			if tt.shouldBeLessThan84 {
+				require.Less(t, len(heatmap), 84,
+					"new users should show less than 12 weeks (84 days), got %d", len(heatmap))
+			}
+
+			// Verify first day is always a Monday
+			firstDate, err := time.Parse("2006-01-02", heatmap[0].Date)
+			require.NoError(t, err)
+			firstWeekday := int(firstDate.Weekday())
+			if firstWeekday == 0 {
+				firstWeekday = 7
+			}
+			require.Equal(t, 1, firstWeekday, "first day should be Monday, got %s", firstDate.Weekday())
+
+			// Verify no gaps in dates (consecutive days)
+			for i := 1; i < len(heatmap); i++ {
+				prevDate, _ := time.Parse("2006-01-02", heatmap[i-1].Date)
+				currDate, _ := time.Parse("2006-01-02", heatmap[i].Date)
+				diff := currDate.Sub(prevDate).Hours() / 24
+				require.Equal(t, 1.0, diff, "dates should be consecutive at index %d", i)
+			}
+
+			// Verify activity data is preserved for past dates
+			for _, dateStr := range tt.activityDates {
+				activityDate, _ := time.Parse("2006-01-02", dateStr)
+				// Only check dates that are in the past or today
+				if activityDate.Before(now) || activityDate.Format("2006-01-02") == now.Format("2006-01-02") {
+					for _, day := range heatmap {
+						if day.Date == dateStr {
+							if day.Time > 0 {
+								// Activity data should be preserved
+								require.Greater(t, day.Lines, 0, "activity on %s should have lines > 0", dateStr)
+							}
+							break
+						}
+					}
+					// Don't require found=true because date might be before the smart range window
+				}
+			}
+
+			// Verify future days are marked with level -1
+			for _, day := range heatmap {
+				dayDate, _ := time.Parse("2006-01-02", day.Date)
+				if dayDate.After(now) {
+					require.Equal(t, -1, day.Level, "future date %s should have level=-1", day.Date)
+				}
+			}
+		})
+	}
+}

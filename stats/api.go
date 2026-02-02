@@ -522,24 +522,76 @@ func (c *Calculator) calculateDailyGoals(period APIPeriodStats, timeGoal float64
 
 func (c *Calculator) generateWeeklyHeatmap(daily map[string]DailyStat, weeks int) []HeatmapDay {
 	maxDuration := 0.0
-	for _, ds := range daily {
+	var firstActivityDate time.Time
+	hasActivity := false
+
+	for dateStr, ds := range daily {
 		duration := float64(ds.Time)
 		if duration > maxDuration {
 			maxDuration = duration
 		}
+
+		// Track first activity date
+		if ds.Time > 0 || ds.Lines > 0 {
+			if d, err := time.Parse("2006-01-02", dateStr); err == nil {
+				if !hasActivity || d.Before(firstActivityDate) {
+					firstActivityDate = d
+					hasActivity = true
+				}
+			}
+		}
 	}
 
 	now := time.Now()
+
+	// Find the START of the current week (Monday)
 	weekday := int(now.Weekday())
 	if weekday == 0 {
 		weekday = 7
 	}
+	daysFromMonday := weekday - 1 // Monday = day 1, so subtract 1
 
-	daysUntilSunday := 7 - weekday
-	endDate := now.AddDate(0, 0, daysUntilSunday)
+	currentWeekMonday := now.AddDate(0, 0, -daysFromMonday)
+	currentWeekMonday = time.Date(
+		currentWeekMonday.Year(),
+		currentWeekMonday.Month(),
+		currentWeekMonday.Day(),
+		0, 0, 0, 0,
+		currentWeekMonday.Location(),
+	)
 
-	totalDays := weeks * 7
-	startDate := endDate.AddDate(0, 0, -(totalDays - 1))
+	// Calculate start date using smart range logic
+	maxWeeksBack := currentWeekMonday.AddDate(0, 0, -(weeks-1)*7)
+
+	var startDate time.Time
+	if hasActivity {
+		// Find Monday of the week containing first activity
+		firstActivityWeekday := int(firstActivityDate.Weekday())
+		if firstActivityWeekday == 0 {
+			firstActivityWeekday = 7
+		}
+		firstActivityMonday := firstActivityDate.AddDate(0, 0, -(firstActivityWeekday - 1))
+		firstActivityMonday = time.Date(
+			firstActivityMonday.Year(),
+			firstActivityMonday.Month(),
+			firstActivityMonday.Day(),
+			0, 0, 0, 0,
+			firstActivityMonday.Location(),
+		)
+
+		// Use the more recent of: first activity Monday or max weeks back
+		if firstActivityMonday.After(maxWeeksBack) {
+			startDate = firstActivityMonday
+		} else {
+			startDate = maxWeeksBack
+		}
+	} else {
+		// No activity, use max weeks back
+		startDate = maxWeeksBack
+	}
+
+	// Calculate total days from start to end of current week
+	totalDays := int(currentWeekMonday.Sub(startDate).Hours()/24) + 7
 
 	heatmap := make([]HeatmapDay, totalDays)
 
