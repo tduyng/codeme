@@ -50,28 +50,10 @@ jobs:
           git push origin v$VERSION
           echo "✓ Release v$VERSION created and pushed"
 
-      - name: Generate release notes
-        id: changelog
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          git cliff --latest --strip all --output RELEASE_NOTES.md
-          echo "Generated release notes for v$VERSION"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: v${{ github.event.inputs.version }}
-          body_path: RELEASE_NOTES.md
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

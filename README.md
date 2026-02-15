@@ -6,7 +6,21 @@ Track your coding sessions automatically. No account, no cloud, no config, just 
 
 ## Install
 
-### Download prebuilt binary (recommended)
+### Homebrew (macOS / Linux)
+
+```bash
+brew install tduyng/tap/codeme
+```
+
+### Go install
+
+Requires [Go 1.25+](https://go.dev/dl/):
+
+```bash
+go install github.com/tduyng/codeme@latest
+```
+
+### Download prebuilt binary
 
 No dependencies needed.
 
@@ -24,41 +38,26 @@ No dependencies needed.
 2. Extract the archive:
 
 ```bash
-# macOS / Linux
 tar -xzf codeme_<version>_<platform>.tar.gz
 ```
 
-3. Move the binary to a directory in your PATH:
+3. Move the binary to your PATH:
 
 ```bash
-# Option A: User local bin (recommended)
+# User local bin (recommended)
 mv codeme ~/.local/bin/codeme
 
-# Option B: System-wide (requires sudo)
+# Or system-wide (requires sudo)
 sudo mv codeme /usr/local/bin/codeme
-```
-
-4. Verify it works:
-
-```bash
-codeme stats
-```
-
-### Go install
-
-Requires [Go 1.25+](https://go.dev/dl/):
-
-```bash
-go install github.com/tduyng/codeme@latest
 ```
 
 ### Build from source
 
-Same requirements as above: Go 1.25+. No external dependencies.
+Requires Go 1.25+:
 
 ```bash
 git clone https://github.com/tduyng/codeme
-cd codeme && just install # must have justfile installed
+cd codeme && just install
 ```
 
 ## Quick Start
