@@ -8,16 +8,41 @@ Track your coding sessions automatically. No account, no cloud, no config, just 
 
 ### Download prebuilt binary (recommended)
 
-No dependencies needed. Download the latest release for your platform:
+No dependencies needed.
+
+1. Download the latest release for your platform:
 
 → [GitHub Releases](https://github.com/tduyng/codeme/releases/latest)
 
-| Platform       | File                         |
-| -------------- | ---------------------------- |
-| macOS (ARM)    | `codeme_darwin_arm64.tar.gz` |
-| macOS (Intel)  | `codeme_darwin_amd64.tar.gz` |
-| Linux (x86_64) | `codeme_linux_amd64.tar.gz`  |
-| Linux (ARM64)  | `codeme_linux_arm64.tar.gz`  |
+| Platform       | File                                   |
+| -------------- | -------------------------------------- |
+| macOS (ARM)    | `codeme_<version>_darwin_arm64.tar.gz` |
+| macOS (Intel)  | `codeme_<version>_darwin_amd64.tar.gz` |
+| Linux (x86_64) | `codeme_<version>_linux_amd64.tar.gz`  |
+| Linux (ARM64)  | `codeme_<version>_linux_arm64.tar.gz`  |
+
+2. Extract the archive:
+
+```bash
+# macOS / Linux
+tar -xzf codeme_<version>_<platform>.tar.gz
+```
+
+3. Move the binary to a directory in your PATH:
+
+```bash
+# Option A: User local bin (recommended)
+mv codeme ~/.local/bin/codeme
+
+# Option B: System-wide (requires sudo)
+sudo mv codeme /usr/local/bin/codeme
+```
+
+4. Verify it works:
+
+```bash
+codeme stats
+```
 
 ### Go install
 
