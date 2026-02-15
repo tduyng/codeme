@@ -1,3 +1,9 @@
+## [0.0.4](https://github.com/tduyng/codeme/compare/v0.0.3..v0.0.4) - 2026-02-15
+
+### Miscellaneous Tasks
+
+- Add version in archive release file - ([9d69dca](https://github.com/tduyng/codeme/commit/9d69dca8f0fa6f473af59f7a21fca4198b780460))
+- Do not need LATEST_CHANGELOG file - ([907faef](https://github.com/tduyng/codeme/commit/907faeffc4f8317d5025e1e27a9d9046ccabad2a))
 ## [0.0.3](https://github.com/tduyng/codeme/compare/v0.0.2..v0.0.3) - 2026-02-15
 
 ### Bug Fixes
