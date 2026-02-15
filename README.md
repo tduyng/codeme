@@ -21,7 +21,7 @@ No dependencies needed. Download the latest release for your platform:
 
 ### Go install
 
-Requires [Go 1.25+](https://go.dev/dl/) and a C compiler (`gcc` or `clang`):
+Requires [Go 1.25+](https://go.dev/dl/):
 
 ```bash
 go install github.com/tduyng/codeme@latest
@@ -29,9 +29,7 @@ go install github.com/tduyng/codeme@latest
 
 ### Build from source
 
-Same requirements as above: Go 1.25+ and a C compiler. The C compiler is needed
-because the SQLite library ([mattn/go-sqlite3](https://github.com/mattn/go-sqlite3)) uses cgo.
-The resulting binary bundles SQLite, no runtime dependency.
+Same requirements as above: Go 1.25+. No external dependencies.
 
 ```bash
 git clone https://github.com/tduyng/codeme

@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/tduyng/codeme/core"
+	_ "modernc.org/sqlite"
 )
 
 func setupTestDB(t *testing.T) (*sql.DB, func()) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 
 	// Create schema
