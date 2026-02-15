@@ -1,3 +1,8 @@
+## [0.0.5](https://github.com/tduyng/codeme/compare/v0.0.4..v0.0.5) - 2026-02-15
+
+### Miscellaneous Tasks
+
+- Change sqlite lib to pur go, do not need gcc enable - ([9f5c6ae](https://github.com/tduyng/codeme/commit/9f5c6ae5ca05819975a05f42ab8ddba9b556cb34))
 ## [0.0.4](https://github.com/tduyng/codeme/compare/v0.0.3..v0.0.4) - 2026-02-15
 
 ### Miscellaneous Tasks
