@@ -18,6 +18,10 @@ install: build
     @mv {{ bin_name }} $(go env GOPATH)/bin
     @echo "✓ Installed {{ bin_name }} {{ version }} to $(go env GOPATH)/bin"
 
+uninstall:
+    @rm -rf $(go env GOPATH)/bin/codeme
+    @echo "✓ Uninstalled {{ bin_name }} from $(go env GOPATH)/bin"
+
 # Run linter (requires golangci-lint)
 lint:
     @echo -e "{{ YELLOW }}Running linter...{{ NORMAL }}"
