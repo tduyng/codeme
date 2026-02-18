@@ -125,7 +125,7 @@ func (s *SQLiteStorage) GetActivitiesSince(since time.Time) ([]Activity, error) 
 	}
 	defer rows.Close()
 
-	return scanActivities(rows)
+	return scanActivities(rows, 1000)
 }
 
 func (s *SQLiteStorage) GetActivityCount() (int, error) {
@@ -163,8 +163,11 @@ func (s *SQLiteStorage) GetDB() *sql.DB {
 	return s.db
 }
 
-func scanActivities(rows *sql.Rows) ([]Activity, error) {
-	var activities []Activity
+func scanActivities(rows *sql.Rows, capacityHint int) ([]Activity, error) {
+	if capacityHint < 100 {
+		capacityHint = 100
+	}
+	activities := make([]Activity, 0, capacityHint)
 
 	for rows.Next() {
 		var a Activity
@@ -209,6 +212,7 @@ func createSchema(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_timestamp_project ON activities(timestamp, project);
 	CREATE INDEX IF NOT EXISTS idx_timestamp_language ON activities(timestamp, language);
 	CREATE INDEX IF NOT EXISTS idx_timestamp_editor ON activities(timestamp, editor);
+	CREATE INDEX IF NOT EXISTS idx_stats_covering ON activities(timestamp, id, lines, language, project, editor, file, is_write);
 	`
 
 	_, err := db.Exec(schema)

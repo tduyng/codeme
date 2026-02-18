@@ -648,13 +648,27 @@ func (c *Calculator) calculateRecords(
 
 	var earliestHour = 24
 	var earliestDate string
+	var latestHour = -1
+	var latestDate string
+	languagesByDay := make(map[string]map[string]bool)
 
 	for _, activity := range activities {
 		hour := activity.Timestamp.In(c.timezone).Hour()
+		date := activity.Timestamp.Format("2006-01-02")
+
 		if hour < earliestHour {
 			earliestHour = hour
-			earliestDate = activity.Timestamp.Format("2006-01-02")
+			earliestDate = date
 		}
+		if hour > latestHour {
+			latestHour = hour
+			latestDate = date
+		}
+
+		if languagesByDay[date] == nil {
+			languagesByDay[date] = make(map[string]bool)
+		}
+		languagesByDay[date][activity.Language] = true
 	}
 
 	if earliestDate != "" {
@@ -664,32 +678,11 @@ func (c *Calculator) calculateRecords(
 		}
 	}
 
-	var latestHour = -1
-	var latestDate string
-
-	for _, activity := range activities {
-		hour := activity.Timestamp.In(c.timezone).Hour()
-		if hour > latestHour {
-			latestHour = hour
-			latestDate = activity.Timestamp.Format("2006-01-02")
-		}
-	}
-
 	if latestDate != "" {
 		records.LatestEnd = TimeRecord{
 			Time: time.Date(0, 1, 1, latestHour, 0, 0, 0, time.UTC).Format("15:04"),
 			Date: latestDate,
 		}
-	}
-
-	languagesByDay := make(map[string]map[string]bool)
-
-	for _, activity := range activities {
-		date := activity.Timestamp.Format("2006-01-02")
-		if languagesByDay[date] == nil {
-			languagesByDay[date] = make(map[string]bool)
-		}
-		languagesByDay[date][activity.Language] = true
 	}
 
 	var maxLangCount int
