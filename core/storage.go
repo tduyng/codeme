@@ -110,7 +110,17 @@ func (s *SQLiteStorage) prepareStatements() error {
 }
 
 func (s *SQLiteStorage) SaveActivity(activity Activity) error {
-	_, err := s.saveStmt.Exec(
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		INSERT INTO activities 
+		(id, timestamp, lines, language, project, editor, file, branch, is_write)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
 		activity.ID,
 		activity.Timestamp.Unix(),
 		activity.Lines,
@@ -121,9 +131,54 @@ func (s *SQLiteStorage) SaveActivity(activity Activity) error {
 		activity.Branch,
 		boolToInt(activity.IsWrite),
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to insert activity: %w", err)
+	}
+
+	const maxGap = 120.0
+	date := activity.Timestamp.Format("2006-01-02")
+
+	_, err = tx.Exec(`
+		INSERT INTO daily_summary (date, total_time, total_lines, activity_count, first_activity, last_activity)
+		VALUES (?, ?, ?, 1, ?, ?)
+		ON CONFLICT(date) DO UPDATE SET
+			total_time = total_time + excluded.total_time,
+			total_lines = total_lines + excluded.total_lines,
+			activity_count = activity_count + 1,
+			first_activity = CASE WHEN excluded.first_activity < daily_summary.first_activity THEN excluded.first_activity ELSE daily_summary.first_activity END,
+			last_activity = CASE WHEN excluded.last_activity > daily_summary.last_activity THEN excluded.last_activity ELSE daily_summary.last_activity END,
+			updated_at = strftime('%s', 'now')
+	`, date, maxGap, activity.Lines, activity.Timestamp.Unix(), activity.Timestamp.Unix())
+	if err != nil {
+		return fmt.Errorf("failed to update daily summary: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO daily_language_summary (date, language, total_time, total_lines, file_count)
+		VALUES (?, ?, ?, ?, 1)
+		ON CONFLICT(date, language) DO UPDATE SET
+			total_time = total_time + excluded.total_time,
+			total_lines = total_lines + excluded.total_lines,
+			file_count = file_count + 1
+	`, date, activity.Language, maxGap, activity.Lines)
+	if err != nil {
+		return fmt.Errorf("failed to update language summary: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO daily_project_summary (date, project, total_time, total_lines, main_language, file_count)
+		VALUES (?, ?, ?, ?, ?, 1)
+		ON CONFLICT(date, project) DO UPDATE SET
+			total_time = total_time + excluded.total_time,
+			total_lines = total_lines + excluded.total_lines,
+			file_count = file_count + 1
+	`, date, activity.Project, maxGap, activity.Lines, activity.Language)
+	if err != nil {
+		return fmt.Errorf("failed to update project summary: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	return nil
