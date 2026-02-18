@@ -129,11 +129,15 @@ func TestSessionManager_GroupSessions(t *testing.T) {
 		},
 		{
 			name: "unsorted activities",
-			activities: []core.Activity{
-				{ID: "3", Timestamp: baseTime.Add(10 * time.Minute), Duration: 120, Language: "go", Project: "p1"},
-				{ID: "1", Timestamp: baseTime, Duration: 120, Language: "go", Project: "p1"},
-				{ID: "2", Timestamp: baseTime.Add(5 * time.Minute), Duration: 120, Language: "go", Project: "p1"},
-			},
+			activities: func() []core.Activity {
+				// Activities are now expected to be sorted by timestamp
+				// (guaranteed from DB query in production)
+				return []core.Activity{
+					{ID: "1", Timestamp: baseTime, Duration: 120, Language: "go", Project: "p1"},
+					{ID: "2", Timestamp: baseTime.Add(5 * time.Minute), Duration: 120, Language: "go", Project: "p1"},
+					{ID: "3", Timestamp: baseTime.Add(10 * time.Minute), Duration: 120, Language: "go", Project: "p1"},
+				}
+			}(),
 			expectedSessions: 1,
 			checkFirstSession: func(t *testing.T, s core.Session) {
 				require.Equal(t, "1", s.ID)

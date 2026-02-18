@@ -1,7 +1,6 @@
 package stats
 
 import (
-	"sort"
 	"time"
 
 	"github.com/tduyng/codeme/core"
@@ -31,17 +30,13 @@ func (sm *SessionManager) GroupSessions(activities []core.Activity) []core.Sessi
 		return nil
 	}
 
-	sorted := make([]core.Activity, len(activities))
-	copy(sorted, activities)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Timestamp.Before(sorted[j].Timestamp)
-	})
-
 	var sessions []core.Session
 	var current *core.Session
 	var projects, languages util.StringSet
+	var runningDuration float64
 
 	start := func(a core.Activity) {
+		runningDuration = 0
 		projects = util.NewStringSet()
 		languages = util.NewStringSet()
 		projects.Add(a.Project)
@@ -58,18 +53,7 @@ func (sm *SessionManager) GroupSessions(activities []core.Activity) []core.Sessi
 	}
 
 	finalize := func() {
-		sessionDuration := 0.0
-		for i := range sorted {
-			if sorted[i].Timestamp.Before(current.StartTime) {
-				continue
-			}
-			if sorted[i].Timestamp.After(current.EndTime) {
-				break
-			}
-			sessionDuration += sorted[i].Duration
-		}
-
-		current.Duration = sessionDuration
+		current.Duration = runningDuration
 		current.Projects = projects.ToSortedSlice()
 		current.Languages = languages.ToSortedSlice()
 
@@ -78,19 +62,22 @@ func (sm *SessionManager) GroupSessions(activities []core.Activity) []core.Sessi
 		}
 	}
 
-	for _, a := range sorted {
+	for _, a := range activities {
 		if current == nil {
 			start(a)
+			runningDuration += a.Duration
 			continue
 		}
 
 		if a.Timestamp.Sub(current.EndTime) > sm.timeout {
 			finalize()
 			start(a)
+			runningDuration += a.Duration
 			continue
 		}
 
 		current.EndTime = a.Timestamp
+		runningDuration += a.Duration
 		projects.Add(a.Project)
 		if IsValidLanguage(a.Language) {
 			languages.Add(NormalizeLanguage(a.Language))

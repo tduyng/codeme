@@ -182,7 +182,7 @@ func handleToday() {
 
 	calc := stats.NewCalculator(time.Local)
 	apiStats, err := calc.CalculateAPI(storage, stats.APIOptions{
-		LoadRecentDays: LOOKBACK_DAYS,
+		LoadRecentDays: 2,
 	})
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)
@@ -208,7 +208,7 @@ func handleProjects() {
 
 	calc := stats.NewCalculator(time.Local)
 	apiStats, err := calc.CalculateAPI(storage, stats.APIOptions{
-		LoadRecentDays: LOOKBACK_DAYS,
+		LoadRecentDays: 90,
 	})
 	if err != nil {
 		fmt.Printf("Error calculating stats: %v\n", err)

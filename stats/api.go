@@ -3,7 +3,6 @@ package stats
 import (
 	"fmt"
 	"math"
-	"sort"
 	"time"
 
 	"github.com/tduyng/codeme/core"
@@ -119,10 +118,6 @@ func (c *Calculator) calculateDurations(activities []core.Activity) []core.Activ
 		return activities
 	}
 
-	sort.Slice(activities, func(i, j int) bool {
-		return activities[i].Timestamp.Before(activities[j].Timestamp)
-	})
-
 	const maxGap = 2 * 60.0
 
 	for i := 0; i < len(activities)-1; i++ {
@@ -200,13 +195,7 @@ func (c *Calculator) getEarliestDate(activities []core.Activity) time.Time {
 	if len(activities) == 0 {
 		return time.Now()
 	}
-	earliest := activities[0].Timestamp
-	for _, a := range activities {
-		if a.Timestamp.Before(earliest) {
-			earliest = a.Timestamp
-		}
-	}
-	return earliest
+	return activities[0].Timestamp
 }
 
 func (c *Calculator) buildPeriod(
