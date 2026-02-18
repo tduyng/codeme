@@ -1,7 +1,6 @@
 package stats
 
 import (
-	"database/sql"
 	"fmt"
 	"math"
 	"sort"
@@ -22,7 +21,7 @@ func NewCalculator(timezone *time.Location) *Calculator {
 	return &Calculator{timezone: timezone}
 }
 
-func (c *Calculator) CalculateAPI(db *sql.DB, opts APIOptions) (*APIStats, error) {
+func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APIStats, error) {
 	startTime := time.Now()
 
 	if opts.LoadRecentDays == 0 {
@@ -30,12 +29,12 @@ func (c *Calculator) CalculateAPI(db *sql.DB, opts APIOptions) (*APIStats, error
 	}
 
 	cutoff := time.Now().AddDate(0, 0, -opts.LoadRecentDays)
-	activities, err := loadActivitiesSince(db, cutoff)
+	activities, err := storage.GetActivitiesSince(cutoff)
 	if err != nil {
 		return nil, err
 	}
 
-	totalCount, _ := getTotalActivityCount(db)
+	totalCount, _ := storage.GetActivityCount()
 
 	activities = c.calculateDurations(activities)
 
@@ -208,50 +207,6 @@ func (c *Calculator) getEarliestDate(activities []core.Activity) time.Time {
 		}
 	}
 	return earliest
-}
-
-func loadActivitiesSince(db *sql.DB, since time.Time) ([]core.Activity, error) {
-	query := `
-		SELECT id, timestamp, lines, language, project,
-		       editor, file, COALESCE(branch, ''), is_write
-		FROM activities
-		WHERE timestamp >= ?
-		ORDER BY timestamp ASC
-	`
-
-	rows, err := db.Query(query, since.Unix())
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	activities := []core.Activity{}
-	for rows.Next() {
-		var a core.Activity
-		var timestampUnix int64
-		var isWriteInt int
-
-		err := rows.Scan(
-			&a.ID, &timestampUnix, &a.Lines, &a.Language,
-			&a.Project, &a.Editor, &a.File, &a.Branch, &isWriteInt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		a.Timestamp = time.Unix(timestampUnix, 0)
-		a.IsWrite = isWriteInt == 1
-
-		activities = append(activities, a)
-	}
-
-	return activities, rows.Err()
-}
-
-func getTotalActivityCount(db *sql.DB) (int, error) {
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM activities").Scan(&count)
-	return count, err
 }
 
 func (c *Calculator) buildPeriod(

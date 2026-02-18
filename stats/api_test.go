@@ -1,7 +1,6 @@
 package stats
 
 import (
-	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,67 +8,34 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tduyng/codeme/core"
-	_ "modernc.org/sqlite"
 )
 
-func setupTestDB(t *testing.T) (*sql.DB, func()) {
+func setupTestDB(t *testing.T) (*core.SQLiteStorage, func()) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err)
-
-	// Create schema
-	schema := `
-	CREATE TABLE activities (
-		id TEXT PRIMARY KEY,
-		timestamp INTEGER NOT NULL,
-		lines INTEGER DEFAULT 0,
-		language TEXT NOT NULL,
-		project TEXT NOT NULL,
-		editor TEXT DEFAULT 'unknown',
-		file TEXT DEFAULT '',
-		branch TEXT,
-		is_write INTEGER DEFAULT 1,
-		created_at INTEGER DEFAULT (strftime('%s', 'now'))
-	) WITHOUT ROWID;
-
-	CREATE INDEX idx_timestamp_project ON activities(timestamp, project);
-	CREATE INDEX idx_timestamp_language ON activities(timestamp, language);
-	`
-
-	_, err = db.Exec(schema)
+	storage, err := core.NewSQLiteStorage(dbPath)
 	require.NoError(t, err)
 
 	cleanup := func() {
-		db.Close()
+		storage.Close()
 		os.RemoveAll(tmpDir)
 	}
 
-	return db, cleanup
+	return storage, cleanup
 }
 
-func insertActivity(t *testing.T, db *sql.DB, a core.Activity) {
-	_, err := db.Exec(`
-		INSERT INTO activities (id, timestamp, lines, language, project, editor, file, is_write)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, a.ID, a.Timestamp.Unix(), a.Lines, a.Language, a.Project, a.Editor, a.File, boolToInt(a.IsWrite))
+func insertActivity(t *testing.T, storage *core.SQLiteStorage, a core.Activity) {
+	err := storage.SaveActivity(a)
 	require.NoError(t, err)
 }
 
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 func TestCalculator_CalculateAPI_Empty(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	calc := NewCalculator(time.UTC)
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
@@ -80,7 +46,7 @@ func TestCalculator_CalculateAPI_Empty(t *testing.T) {
 }
 
 func TestCalculator_CalculateAPI_SingleDay(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	// Use UTC consistently — CalculateAPI internally uses time.Now().In(timezone),
@@ -114,11 +80,11 @@ func TestCalculator_CalculateAPI_SingleDay(t *testing.T) {
 	}
 
 	for _, a := range activities {
-		insertActivity(t, db, a)
+		insertActivity(t, storage, a)
 	}
 
 	calc := NewCalculator(time.UTC)
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
@@ -131,7 +97,7 @@ func TestCalculator_CalculateAPI_SingleDay(t *testing.T) {
 }
 
 func TestCalculator_CalculateAPI_MultipleProjects(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	baseTime := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -143,11 +109,11 @@ func TestCalculator_CalculateAPI_MultipleProjects(t *testing.T) {
 	}
 
 	for _, a := range activities {
-		insertActivity(t, db, a)
+		insertActivity(t, storage, a)
 	}
 
 	calc := NewCalculator(time.UTC)
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 365})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 365})
 
 	require.NoError(t, err)
 	// Duration is calculated by the calculator, so projects/languages may be aggregated
@@ -155,7 +121,7 @@ func TestCalculator_CalculateAPI_MultipleProjects(t *testing.T) {
 }
 
 func TestCalculator_CalculateAPI_WeeklyStats(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	tz := time.UTC
@@ -169,11 +135,11 @@ func TestCalculator_CalculateAPI_WeeklyStats(t *testing.T) {
 	}
 
 	for _, a := range activities {
-		insertActivity(t, db, a)
+		insertActivity(t, storage, a)
 	}
 
 	calc := NewCalculator(tz)
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 365})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 365})
 
 	require.NoError(t, err)
 	require.Greater(t, stats.ThisWeek.TotalTime, stats.LastWeek.TotalTime)
@@ -181,7 +147,7 @@ func TestCalculator_CalculateAPI_WeeklyStats(t *testing.T) {
 }
 
 func TestCalculator_CalculateAPI_Sessions(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	baseTime := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -198,11 +164,11 @@ func TestCalculator_CalculateAPI_Sessions(t *testing.T) {
 	}
 
 	for _, a := range activities {
-		insertActivity(t, db, a)
+		insertActivity(t, storage, a)
 	}
 
 	calc := NewCalculator(time.UTC)
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 365})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 365})
 
 	require.NoError(t, err)
 	// Sessions may be grouped differently based on calculated durations
@@ -210,7 +176,7 @@ func TestCalculator_CalculateAPI_Sessions(t *testing.T) {
 }
 
 func TestCalculator_CalculateAPI_Comprehensive(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	baseTime := time.Now().UTC().AddDate(0, 0, -3)
@@ -229,11 +195,11 @@ func TestCalculator_CalculateAPI_Comprehensive(t *testing.T) {
 	}
 
 	for _, a := range activities {
-		insertActivity(t, db, a)
+		insertActivity(t, storage, a)
 	}
 
 	calc := NewCalculator(time.UTC)
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
@@ -242,7 +208,7 @@ func TestCalculator_CalculateAPI_Comprehensive(t *testing.T) {
 }
 
 func TestCalculator_CalculateAPI_FocusScore(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	now := time.Now().UTC()
@@ -256,11 +222,11 @@ func TestCalculator_CalculateAPI_FocusScore(t *testing.T) {
 	}
 
 	for _, a := range activities {
-		insertActivity(t, db, a)
+		insertActivity(t, storage, a)
 	}
 
 	calc := NewCalculator(time.UTC)
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 
 	require.NoError(t, err)
 	require.LessOrEqual(t, stats.Today.FocusScore, 100)
@@ -268,7 +234,7 @@ func TestCalculator_CalculateAPI_FocusScore(t *testing.T) {
 }
 
 func TestCalculator_CalculateAPI_LoadRecentDays(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	now := time.Now().UTC()
@@ -276,7 +242,7 @@ func TestCalculator_CalculateAPI_LoadRecentDays(t *testing.T) {
 
 	// Create activities over 200 days
 	for i := range 200 {
-		insertActivity(t, db, core.Activity{
+		insertActivity(t, storage, core.Activity{
 			ID:        string(rune(i)),
 			Timestamp: baseTime.AddDate(0, 0, -i),
 			Duration:  100,
@@ -289,27 +255,27 @@ func TestCalculator_CalculateAPI_LoadRecentDays(t *testing.T) {
 
 	t.Run("load 30 days", func(t *testing.T) {
 		calc := NewCalculator(time.UTC)
-		stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 30})
+		stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 30})
 		require.NoError(t, err)
 		require.LessOrEqual(t, stats.Meta.LoadedActivities, 31) // May include today
 	})
 
 	t.Run("load 180 days", func(t *testing.T) {
 		calc := NewCalculator(time.UTC)
-		stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+		stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 		require.NoError(t, err)
 		require.LessOrEqual(t, stats.Meta.LoadedActivities, 181) // May include today
 	})
 }
 
 func TestCalculator_Timezone(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	est, _ := time.LoadLocation("America/New_York")
 	utcTime := time.Date(2025, 1, 15, 23, 0, 0, 0, time.UTC)
 
-	insertActivity(t, db, core.Activity{
+	insertActivity(t, storage, core.Activity{
 		ID:        "1",
 		Timestamp: utcTime,
 		Duration:  100,
@@ -321,14 +287,14 @@ func TestCalculator_Timezone(t *testing.T) {
 
 	t.Run("UTC timezone", func(t *testing.T) {
 		calc := NewCalculator(time.UTC)
-		stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+		stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 		require.NoError(t, err)
 		require.NotNil(t, stats)
 	})
 
 	t.Run("EST timezone", func(t *testing.T) {
 		calc := NewCalculator(est)
-		stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+		stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 		require.NoError(t, err)
 		require.NotNil(t, stats)
 	})
@@ -336,10 +302,10 @@ func TestCalculator_Timezone(t *testing.T) {
 
 func TestCalculator_EdgeCases(t *testing.T) {
 	t.Run("zero duration activities", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		storage, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		insertActivity(t, db, core.Activity{
+		insertActivity(t, storage, core.Activity{
 			ID:        "1",
 			Timestamp: time.Now().UTC(),
 			Duration:  0,
@@ -350,18 +316,18 @@ func TestCalculator_EdgeCases(t *testing.T) {
 		})
 
 		calc := NewCalculator(time.UTC)
-		stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+		stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 		require.NoError(t, err)
 		require.NotNil(t, stats)
 	})
 
 	t.Run("same timestamp activities", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		storage, cleanup := setupTestDB(t)
 		defer cleanup()
 
 		sameTime := time.Now().UTC()
 		for i := range 5 {
-			insertActivity(t, db, core.Activity{
+			insertActivity(t, storage, core.Activity{
 				ID:        string(rune(i)),
 				Timestamp: sameTime,
 				Duration:  100,
@@ -373,7 +339,7 @@ func TestCalculator_EdgeCases(t *testing.T) {
 		}
 
 		calc := NewCalculator(time.UTC)
-		stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+		stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 		require.NoError(t, err)
 		require.Equal(t, 5, stats.Meta.LoadedActivities)
 	})
@@ -384,13 +350,13 @@ func TestCalculator_Performance(t *testing.T) {
 		t.Skip("skipping performance test in short mode")
 	}
 
-	db, cleanup := setupTestDB(t)
+	storage, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	// Insert 10,000 activities
 	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	for i := range 10000 {
-		insertActivity(t, db, core.Activity{
+		insertActivity(t, storage, core.Activity{
 			ID:        string(rune(i)),
 			Timestamp: baseTime.Add(time.Duration(i) * time.Minute),
 			Duration:  float64(60 + (i % 120)),
@@ -404,7 +370,7 @@ func TestCalculator_Performance(t *testing.T) {
 
 	calc := NewCalculator(time.UTC)
 	start := time.Now()
-	stats, err := calc.CalculateAPI(db, APIOptions{LoadRecentDays: 180})
+	stats, err := calc.CalculateAPI(storage, APIOptions{LoadRecentDays: 180})
 	duration := time.Since(start)
 
 	require.NoError(t, err)

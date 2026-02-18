@@ -81,7 +81,7 @@ func (s *SQLiteStorage) prepareStatements() error {
 
 	s.getRecentStmt, err = s.db.Prepare(`
 		SELECT id, timestamp, lines, language, project, editor, file, 
-		       COALESCE(branch, ''), is_write
+		       branch, is_write
 		FROM activities
 		WHERE timestamp >= ?
 		ORDER BY timestamp ASC
@@ -170,10 +170,11 @@ func scanActivities(rows *sql.Rows) ([]Activity, error) {
 		var a Activity
 		var timestamp int64
 		var isWriteInt int
+		var branch sql.NullString
 
 		err := rows.Scan(
 			&a.ID, &timestamp, &a.Lines, &a.Language,
-			&a.Project, &a.Editor, &a.File, &a.Branch,
+			&a.Project, &a.Editor, &a.File, &branch,
 			&isWriteInt,
 		)
 		if err != nil {
@@ -182,6 +183,7 @@ func scanActivities(rows *sql.Rows) ([]Activity, error) {
 
 		a.Timestamp = time.Unix(timestamp, 0)
 		a.IsWrite = isWriteInt == 1
+		a.Branch = branch.String
 
 		activities = append(activities, a)
 	}
@@ -211,20 +213,6 @@ func createSchema(db *sql.DB) error {
 
 	_, err := db.Exec(schema)
 	return err
-}
-
-func OpenDB() (*sql.DB, error) {
-	dbPath, err := GetDefaultDBPath()
-	if err != nil {
-		return nil, err
-	}
-
-	storage, err := NewSQLiteStorage(dbPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return storage.db, nil
 }
 
 func GetDefaultDBPath() (string, error) {

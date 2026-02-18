@@ -137,15 +137,21 @@ func handleStats(args []string) {
 	todayOnly := fs.Bool("today", false, "Show only today's stats")
 	fs.Parse(args)
 
-	db, err := core.OpenDB()
+	dbPath, err := core.GetDefaultDBPath()
+	if err != nil {
+		fmt.Printf("Error resolving DB path: %v\n", err)
+		os.Exit(1)
+	}
+
+	storage, err := core.NewSQLiteStorage(dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer storage.Close()
 
 	calc := stats.NewCalculator(time.Local)
-	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
+	apiStats, err := calc.CalculateAPI(storage, stats.APIOptions{
 		LoadRecentDays: LOOKBACK_DAYS,
 	})
 	if err != nil {
@@ -161,15 +167,21 @@ func handleStats(args []string) {
 }
 
 func handleToday() {
-	db, err := core.OpenDB()
+	dbPath, err := core.GetDefaultDBPath()
+	if err != nil {
+		fmt.Printf("Error resolving DB path: %v\n", err)
+		os.Exit(1)
+	}
+
+	storage, err := core.NewSQLiteStorage(dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer storage.Close()
 
 	calc := stats.NewCalculator(time.Local)
-	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
+	apiStats, err := calc.CalculateAPI(storage, stats.APIOptions{
 		LoadRecentDays: LOOKBACK_DAYS,
 	})
 	if err != nil {
@@ -181,15 +193,21 @@ func handleToday() {
 }
 
 func handleProjects() {
-	db, err := core.OpenDB()
+	dbPath, err := core.GetDefaultDBPath()
+	if err != nil {
+		fmt.Printf("Error resolving DB path: %v\n", err)
+		os.Exit(1)
+	}
+
+	storage, err := core.NewSQLiteStorage(dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer storage.Close()
 
 	calc := stats.NewCalculator(time.Local)
-	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
+	apiStats, err := calc.CalculateAPI(storage, stats.APIOptions{
 		LoadRecentDays: LOOKBACK_DAYS,
 	})
 	if err != nil {
@@ -206,15 +224,21 @@ func handleAPI(args []string) {
 	days := fs.Int("days", LOOKBACK_DAYS, "Load activities from last N days (default: 365)")
 	fs.Parse(args)
 
-	db, err := core.OpenDB()
+	dbPath, err := core.GetDefaultDBPath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error resolving DB path: %v\n", err)
+		os.Exit(1)
+	}
+
+	storage, err := core.NewSQLiteStorage(dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer storage.Close()
 
 	calc := stats.NewCalculator(time.Local)
-	apiStats, err := calc.CalculateAPI(db, stats.APIOptions{
+	apiStats, err := calc.CalculateAPI(storage, stats.APIOptions{
 		LoadRecentDays: *days,
 	})
 	if err != nil {
