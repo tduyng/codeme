@@ -4,8 +4,6 @@ package core
 import (
 	"fmt"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type Tracker struct {
@@ -34,7 +32,7 @@ func (t *Tracker) TrackFileActivity(filePath, language, editor string, linesChan
 	}
 
 	activity := Activity{
-		ID:        uuid.New().String(),
+		ID:        GenerateID(),
 		Timestamp: now,
 		Duration:  0,
 		Lines:     linesChanged,
