@@ -30,6 +30,7 @@ type Storage interface {
 	SaveActivity(Activity) error
 	GetActivitiesSince(time.Time) ([]Activity, error)
 	GetActivityCount() (int, error)
+	GetDailySummaries() (map[string]DailySummary, error)
 	Optimize() error
 	RebuildSummaries() error
 	Close() error

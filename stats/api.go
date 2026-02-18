@@ -84,6 +84,8 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 		}
 	}
 
+	// Build dailyActivity from computed dayAgg (not summary tables)
+	// Summary tables have approximate duration (maxGap), not actual durations
 	dailyActivity := make(map[string]DailyStat)
 	for date, agg := range dayAgg {
 		dailyActivity[date] = DailyStat{

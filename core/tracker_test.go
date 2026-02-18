@@ -31,6 +31,10 @@ func (m *mockStorage) GetActivityCount() (int, error) {
 	return len(m.activities), nil
 }
 
+func (m *mockStorage) GetDailySummaries() (map[string]DailySummary, error) {
+	return make(map[string]DailySummary), nil
+}
+
 func (m *mockStorage) Optimize() error {
 	return nil
 }

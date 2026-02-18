@@ -200,6 +200,35 @@ func (s *SQLiteStorage) GetActivityCount() (int, error) {
 	return count, err
 }
 
+type DailySummary struct {
+	Date          string
+	TotalTime     float64
+	TotalLines    int
+	ActivityCount int
+}
+
+func (s *SQLiteStorage) GetDailySummaries() (map[string]DailySummary, error) {
+	rows, err := s.db.Query(`
+		SELECT date, total_time, total_lines, activity_count 
+		FROM daily_summary 
+		ORDER BY date DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query daily summaries: %w", err)
+	}
+	defer rows.Close()
+
+	summaries := make(map[string]DailySummary)
+	for rows.Next() {
+		var ds DailySummary
+		if err := rows.Scan(&ds.Date, &ds.TotalTime, &ds.TotalLines, &ds.ActivityCount); err != nil {
+			return nil, err
+		}
+		summaries[ds.Date] = ds
+	}
+	return summaries, nil
+}
+
 func (s *SQLiteStorage) Optimize() error {
 	if _, err := s.db.Exec("VACUUM"); err != nil {
 		return fmt.Errorf("failed to vacuum: %w", err)
