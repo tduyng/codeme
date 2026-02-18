@@ -67,6 +67,17 @@ func NewSQLiteStorage(dbPath string) (*SQLiteStorage, error) {
 	return storage, nil
 }
 
+func OpenReadOnlyStorage(dbPath string) (*SQLiteStorage, error) {
+	storage, err := NewSQLiteStorage(dbPath)
+	if err != nil {
+		return nil, err
+	}
+
+	storage.db.Exec("PRAGMA query_only = ON")
+
+	return storage, nil
+}
+
 func (s *SQLiteStorage) prepareStatements() error {
 	var err error
 

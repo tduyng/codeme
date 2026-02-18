@@ -41,6 +41,8 @@ func main() {
 		handleAPI(os.Args[2:])
 	case "optimize":
 		handleOptimize()
+	case "rebuild-summaries":
+		handleRebuildSummaries()
 	case "info":
 		handleInfo()
 	case "version", "-v", "--version":
@@ -143,7 +145,7 @@ func handleStats(args []string) {
 		os.Exit(1)
 	}
 
-	storage, err := core.NewSQLiteStorage(dbPath)
+	storage, err := core.OpenReadOnlyStorage(dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
 		os.Exit(1)
@@ -173,7 +175,7 @@ func handleToday() {
 		os.Exit(1)
 	}
 
-	storage, err := core.NewSQLiteStorage(dbPath)
+	storage, err := core.OpenReadOnlyStorage(dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
 		os.Exit(1)
@@ -199,7 +201,7 @@ func handleProjects() {
 		os.Exit(1)
 	}
 
-	storage, err := core.NewSQLiteStorage(dbPath)
+	storage, err := core.OpenReadOnlyStorage(dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
 		os.Exit(1)
@@ -230,7 +232,7 @@ func handleAPI(args []string) {
 		os.Exit(1)
 	}
 
-	storage, err := core.NewSQLiteStorage(dbPath)
+	storage, err := core.OpenReadOnlyStorage(dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
 		os.Exit(1)
@@ -285,6 +287,36 @@ func handleOptimize() {
 	fmt.Println("  • Rebuilt indexes")
 	fmt.Println("  • Reclaimed space")
 	fmt.Println("  • Analyzed query patterns")
+}
+
+func handleRebuildSummaries() {
+	fmt.Println("📊 Rebuilding summary tables...")
+
+	dbPath, err := core.GetDefaultDBPath()
+	if err != nil {
+		fmt.Printf("Error resolving DB path: %v\n", err)
+		os.Exit(1)
+	}
+
+	storage, err := core.NewSQLiteStorage(dbPath)
+	if err != nil {
+		fmt.Printf("Error opening database: %v\n", err)
+		os.Exit(1)
+	}
+	defer storage.Close()
+
+	startTime := time.Now()
+
+	if err := storage.RebuildSummaries(); err != nil {
+		fmt.Printf("❌ Error rebuilding summaries: %v\n", err)
+		os.Exit(1)
+	}
+
+	duration := time.Since(startTime)
+	fmt.Printf("✓ Summary tables rebuilt in %.2fs\n", duration.Seconds())
+	fmt.Println("  • daily_summary")
+	fmt.Println("  • daily_language_summary")
+	fmt.Println("  • daily_project_summary")
 }
 
 func handleInfo() {
