@@ -63,14 +63,6 @@ func TestSessionManager_GroupSessions(t *testing.T) {
 			timeout:          15 * time.Minute,
 		},
 		{
-			name: "below min duration filtered",
-			activities: []core.Activity{
-				{ID: "1", Timestamp: baseTime, Duration: 30, Language: "go", Project: "p1"},
-			},
-			expectedSessions: 0,
-			minDuration:      1 * time.Minute,
-		},
-		{
 			name: "mixed languages",
 			activities: []core.Activity{
 				{ID: "1", Timestamp: baseTime, Duration: 120, Language: "go", Project: "p1"},
@@ -256,7 +248,8 @@ func TestSessionManager_EdgeCases(t *testing.T) {
 		sm := NewSessionManager(15*time.Minute, 1*time.Minute)
 		sessions := sm.GroupSessions(activities)
 
-		require.Len(t, sessions, 0)
+		// Single activity gets idleCap duration (120s), which passes minDuration
+		require.Len(t, sessions, 1)
 	})
 
 	t.Run("cross-day session", func(t *testing.T) {

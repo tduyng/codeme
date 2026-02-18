@@ -50,6 +50,7 @@ type APILanguageStats struct {
 	PercentTotal float64 `json:"percent_total"`
 	Proficiency  string  `json:"proficiency"`
 	HoursTotal   float64 `json:"hours_total"`
+	IsCode       bool    `json:"is_code"`
 }
 
 type APIProjectStats struct {

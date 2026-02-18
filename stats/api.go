@@ -37,6 +37,61 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 		return cached, nil
 	}
 
+	now := time.Now().In(c.timezone)
+
+	todayStart := util.StartOfDay(now, c.timezone)
+	yesterdayStart := util.StartOfDay(now.AddDate(0, 0, -1), c.timezone)
+	thisWeekStart := util.StartOfWeek(now, c.timezone)
+	lastWeekStart := util.StartOfWeek(now.AddDate(0, 0, -7), c.timezone)
+	thisMonthStart := util.StartOfMonth(now, c.timezone)
+	lastMonthStart := util.StartOfMonth(now.AddDate(0, -1, 0), c.timezone)
+
+	todaySummary, _ := storage.GetPeriodSummary(todayStart, now)
+	yesterdaySummary, _ := storage.GetPeriodSummary(yesterdayStart, todayStart)
+	thisWeekSummary, _ := storage.GetPeriodSummary(thisWeekStart, now)
+	lastWeekSummary, _ := storage.GetPeriodSummary(lastWeekStart, thisWeekStart)
+	thisMonthSummary, _ := storage.GetPeriodSummary(thisMonthStart, now)
+	lastMonthSummary, _ := storage.GetPeriodSummary(lastMonthStart, thisMonthStart)
+	allTimeSummary, _ := storage.GetPeriodSummary(time.Time{}, now)
+
+	todayLangs, _ := storage.GetLanguageSummary(todayStart, now)
+	yesterdayLangs, _ := storage.GetLanguageSummary(yesterdayStart, todayStart)
+	thisWeekLangs, _ := storage.GetLanguageSummary(thisWeekStart, now)
+	lastWeekLangs, _ := storage.GetLanguageSummary(lastWeekStart, thisWeekStart)
+	thisMonthLangs, _ := storage.GetLanguageSummary(thisMonthStart, now)
+	lastMonthLangs, _ := storage.GetLanguageSummary(lastMonthStart, thisMonthStart)
+	allTimeLangs, _ := storage.GetLanguageSummary(time.Time{}, now)
+
+	todayProjs, _ := storage.GetProjectSummary(todayStart, now)
+	yesterdayProjs, _ := storage.GetProjectSummary(yesterdayStart, todayStart)
+	thisWeekProjs, _ := storage.GetProjectSummary(thisWeekStart, now)
+	lastWeekProjs, _ := storage.GetProjectSummary(lastWeekStart, thisWeekStart)
+	thisMonthProjs, _ := storage.GetProjectSummary(thisMonthStart, now)
+	lastMonthProjs, _ := storage.GetProjectSummary(lastMonthStart, thisMonthStart)
+	allTimeProjs, _ := storage.GetProjectSummary(time.Time{}, now)
+
+	todayEditors, _ := storage.GetEditorSummary(todayStart, now)
+	yesterdayEditors, _ := storage.GetEditorSummary(yesterdayStart, todayStart)
+	thisWeekEditors, _ := storage.GetEditorSummary(thisWeekStart, now)
+	lastWeekEditors, _ := storage.GetEditorSummary(lastWeekStart, thisWeekStart)
+	thisMonthEditors, _ := storage.GetEditorSummary(thisMonthStart, now)
+	lastMonthEditors, _ := storage.GetEditorSummary(lastMonthStart, thisMonthStart)
+	allTimeEditors, _ := storage.GetEditorSummary(time.Time{}, now)
+
+	lifetimeHours := make(map[string]float64)
+	for _, lr := range allTimeLangs {
+		lifetimeHours[lr.Language] = lr.TotalTime / 3600
+	}
+
+	projectLangs := make(map[string]map[string]float64)
+	for _, pr := range allTimeProjs {
+		pl := make(map[string]float64)
+		for _, lr := range allTimeLangs {
+			pl[lr.Language] = lr.TotalTime / 3600
+		}
+		projectLangs[pr.Project] = pl
+	}
+
 	cutoff := time.Now().AddDate(0, 0, -opts.LoadRecentDays)
 	activities, err := storage.GetActivitiesSince(cutoff)
 	if err != nil {
@@ -45,31 +100,17 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 
 	totalCount, _ := storage.GetActivityCount()
 
-	activities = c.calculateDurations(activities)
-
-	sessionMgr := NewSessionManager(15*time.Minute, 1*time.Minute)
-	sessions := sessionMgr.GroupSessions(activities)
+	sessionMgr := NewSessionManager(0, 0)
+	activities, sessions := sessionMgr.GroupAndCalculate(activities)
 	sessionsByDay := c.indexSessionsByDay(sessions)
 
-	now := time.Now().In(c.timezone)
-
-	todayActivities := c.filterPeriod(activities, now, "today")
-	yesterdayActivities := c.filterPeriod(activities, now.AddDate(0, 0, -1), "today")
-	thisWeekActivities := c.filterPeriod(activities, now, "week")
-	lastWeekActivities := c.filterPeriod(activities, now.AddDate(0, 0, -7), "week")
-	thisMonthActivities := c.filterPeriod(activities, now, "month")
-	lastMonthActivities := c.filterPeriod(activities, now.AddDate(0, -1, 0), "month")
-
-	lifetimeHours := c.calculateLifetimeHours(activities)
-	projectLangs := c.calculateProjectLanguages(activities)
-
-	today := c.buildPeriod("today", todayActivities, sessions, sessionsByDay, lifetimeHours, projectLangs, util.StartOfDay(now, c.timezone), now)
-	yesterday := c.buildPeriod("yesterday", yesterdayActivities, sessions, sessionsByDay, lifetimeHours, projectLangs, util.StartOfDay(now.AddDate(0, 0, -1), c.timezone), util.StartOfDay(now, c.timezone))
-	thisWeek := c.buildPeriod("this_week", thisWeekActivities, sessions, sessionsByDay, lifetimeHours, projectLangs, util.StartOfWeek(now, c.timezone), now)
-	lastWeek := c.buildPeriod("last_week", lastWeekActivities, sessions, sessionsByDay, lifetimeHours, projectLangs, util.StartOfWeek(now.AddDate(0, 0, -7), c.timezone), util.StartOfWeek(now, c.timezone))
-	thisMonth := c.buildPeriod("this_month", thisMonthActivities, sessions, sessionsByDay, lifetimeHours, projectLangs, util.StartOfMonth(now, c.timezone), now)
-	lastMonth := c.buildPeriod("last_month", lastMonthActivities, sessions, sessionsByDay, lifetimeHours, projectLangs, util.StartOfMonth(now.AddDate(0, -1, 0), c.timezone), util.StartOfMonth(now, c.timezone))
-	allTime := c.buildPeriod("all_time", activities, sessions, sessionsByDay, lifetimeHours, projectLangs, c.getEarliestDate(activities), now)
+	today := c.buildPeriodFromSummary("today", todaySummary, todayLangs, todayProjs, todayEditors, sessions, sessionsByDay, lifetimeHours, projectLangs, todayStart, now, activities)
+	yesterday := c.buildPeriodFromSummary("yesterday", yesterdaySummary, yesterdayLangs, yesterdayProjs, yesterdayEditors, sessions, sessionsByDay, lifetimeHours, projectLangs, yesterdayStart, todayStart, activities)
+	thisWeek := c.buildPeriodFromSummary("this_week", thisWeekSummary, thisWeekLangs, thisWeekProjs, thisWeekEditors, sessions, sessionsByDay, lifetimeHours, projectLangs, thisWeekStart, now, activities)
+	lastWeek := c.buildPeriodFromSummary("last_week", lastWeekSummary, lastWeekLangs, lastWeekProjs, lastWeekEditors, sessions, sessionsByDay, lifetimeHours, projectLangs, lastWeekStart, thisWeekStart, activities)
+	thisMonth := c.buildPeriodFromSummary("this_month", thisMonthSummary, thisMonthLangs, thisMonthProjs, thisMonthEditors, sessions, sessionsByDay, lifetimeHours, projectLangs, thisMonthStart, now, activities)
+	lastMonth := c.buildPeriodFromSummary("last_month", lastMonthSummary, lastMonthLangs, lastMonthProjs, lastMonthEditors, sessions, sessionsByDay, lifetimeHours, projectLangs, lastMonthStart, thisMonthStart, activities)
+	allTime := c.buildPeriodFromSummary("all_time", allTimeSummary, allTimeLangs, allTimeProjs, allTimeEditors, sessions, sessionsByDay, lifetimeHours, projectLangs, time.Time{}, now, activities)
 
 	streakCalc := NewStreakCalculator(c.timezone)
 	streakInfo := streakCalc.Calculate(activities)
@@ -84,8 +125,6 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 		}
 	}
 
-	// Build dailyActivity from computed dayAgg (not summary tables)
-	// Summary tables have approximate duration (maxGap), not actual durations
 	dailyActivity := make(map[string]DailyStat)
 	for date, agg := range dayAgg {
 		dailyActivity[date] = DailyStat{
@@ -129,127 +168,58 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 	return result, nil
 }
 
-func (c *Calculator) calculateDurations(activities []core.Activity) []core.Activity {
-	if len(activities) == 0 {
-		return activities
-	}
-
-	const maxGap = 2 * 60.0
-
-	for i := 0; i < len(activities)-1; i++ {
-		gap := activities[i+1].Timestamp.Sub(activities[i].Timestamp).Seconds()
-		if gap > maxGap {
-			activities[i].Duration = maxGap
-		} else {
-			activities[i].Duration = gap
-		}
-	}
-
-	if len(activities) > 0 {
-		activities[len(activities)-1].Duration = maxGap
-	}
-
-	return activities
-}
-
-func (c *Calculator) indexSessionsByDay(sessions []core.Session) map[string][]core.Session {
-	index := make(map[string][]core.Session)
-	for _, s := range sessions {
-		day := util.DateString(s.StartTime, c.timezone)
-		index[day] = append(index[day], s)
-	}
-	return index
-}
-
-func (c *Calculator) filterPeriod(activities []core.Activity, anchor time.Time, period string) []core.Activity {
-	var start, end time.Time
-
-	switch period {
-	case "today":
-		start = util.StartOfDay(anchor, c.timezone)
-		end = start.AddDate(0, 0, 1)
-	case "week":
-		start = util.StartOfWeek(anchor, c.timezone)
-		end = start.AddDate(0, 0, 7)
-	case "month":
-		start = util.StartOfMonth(anchor, c.timezone)
-		end = start.AddDate(0, 1, 0)
-	default:
-		return activities
-	}
-
-	filtered := make([]core.Activity, 0)
-	for _, a := range activities {
-		if !a.Timestamp.Before(start) && a.Timestamp.Before(end) {
-			filtered = append(filtered, a)
-		}
-	}
-
-	return filtered
-}
-
-func (c *Calculator) calculateLifetimeHours(activities []core.Activity) map[string]float64 {
-	hours := make(map[string]float64)
-	for _, a := range activities {
-		hours[a.Language] += a.Duration / 3600
-	}
-	return hours
-}
-
-func (c *Calculator) calculateProjectLanguages(activities []core.Activity) map[string]map[string]float64 {
-	projectLangs := make(map[string]map[string]float64)
-	for _, a := range activities {
-		if projectLangs[a.Project] == nil {
-			projectLangs[a.Project] = make(map[string]float64)
-		}
-		projectLangs[a.Project][a.Language] += a.Duration
-	}
-	return projectLangs
-}
-
-func (c *Calculator) getEarliestDate(activities []core.Activity) time.Time {
-	if len(activities) == 0 {
-		return time.Now()
-	}
-	return activities[0].Timestamp
-}
-
-func (c *Calculator) buildPeriod(
+func (c *Calculator) buildPeriodFromSummary(
 	period string,
-	activities []core.Activity,
+	summary core.PeriodSummary,
+	langRows []core.LanguageRow,
+	projRows []core.ProjectRow,
+	editorRows []core.EditorRow,
 	allSessions []core.Session,
 	sessionsByDay map[string][]core.Session,
 	lifetimeHours map[string]float64,
 	projectLangs map[string]map[string]float64,
 	start, end time.Time,
+	activities []core.Activity,
 ) APIPeriodStats {
 	periodSessions := c.filterSessions(allSessions, start, end)
 
-	totalTime := 0.0
-	totalLines := 0
-	files := util.NewStringSet()
+	var periodActivities []core.Activity
+	if !start.IsZero() {
+		for _, a := range activities {
+			if !a.Timestamp.Before(start) && a.Timestamp.Before(end) {
+				periodActivities = append(periodActivities, a)
+			}
+		}
+	} else {
+		periodActivities = activities
+	}
 
-	for _, a := range activities {
-		totalTime += a.Duration
-		totalLines += a.Lines
+	periodSessionsByDay := make(map[string][]core.Session)
+	for date, sess := range sessionsByDay {
+		if !end.IsZero() && date < end.Format("2006-01-02") {
+			if start.IsZero() || date >= start.Format("2006-01-02") {
+				periodSessionsByDay[date] = sess
+			}
+		}
+	}
+
+	files := util.NewStringSet()
+	for _, a := range periodActivities {
 		if a.File != "" {
 			files.Add(a.File)
 		}
 	}
 
-	langAgg := AggregateByLanguage(activities)
-	projAgg := AggregateByProject(activities)
-	editorAgg := AggregateByEditor(activities)
-	fileAgg := AggregateByFile(activities)
-	hourAgg := AggregateByHour(activities, c.timezone)
+	languages := c.convertLanguageRows(langRows, lifetimeHours, summary.TotalTime)
+	projects := c.convertProjectRows(projRows, projectLangs, summary.TotalTime)
+	editors := c.convertEditorRows(editorRows, summary.TotalTime)
 
-	languages := TopLanguages(langAgg, lifetimeHours, totalTime, 10)
-	projects := TopProjects(projAgg, projectLangs, totalTime, 10)
-	editors := TopEditors(editorAgg, totalTime, 10)
-	topFiles := TopFiles(fileAgg, totalTime, 10)
-
-	hourlyActivity := c.buildHourlyActivity(hourAgg, totalTime)
+	hourAgg := AggregateByHour(periodActivities, c.timezone)
+	hourlyActivity := c.buildHourlyActivity(hourAgg, summary.TotalTime)
 	peakHour := c.findPeakHour(hourlyActivity)
+
+	fileAgg := AggregateByFile(periodActivities)
+	topFiles := TopFiles(fileAgg, summary.TotalTime, 10)
 
 	apiSessions := ConvertSessionsToAPI(periodSessions)
 	focusScore := c.calculateFocusScore(periodSessions)
@@ -258,8 +228,8 @@ func (c *Calculator) buildPeriod(
 		Period:         period,
 		StartDate:      start,
 		EndDate:        end,
-		TotalTime:      totalTime,
-		TotalLines:     totalLines,
+		TotalTime:      summary.TotalTime,
+		TotalLines:     summary.TotalLines,
 		TotalFiles:     files.Len(),
 		Languages:      languages,
 		Projects:       projects,
@@ -275,14 +245,14 @@ func (c *Calculator) buildPeriod(
 	if period == "today" {
 		result.DailyGoals = c.calculateDailyGoals(result, 4*3600, 500)
 	} else {
-		dayAgg := AggregateByDay(activities, c.timezone)
+		dayAgg := AggregateByDay(periodActivities, c.timezone)
 
 		var bestTimeDay *DayRecord
 		var bestLinesDay *DayRecord
 
 		for date, day := range dayAgg {
 			sessCount := 0
-			if sessions, ok := sessionsByDay[date]; ok {
+			if sessions, ok := periodSessionsByDay[date]; ok {
 				sessCount = len(sessions)
 			}
 
@@ -296,12 +266,10 @@ func (c *Calculator) buildPeriod(
 				Projects:     day.Projects.ToSortedSlice(),
 			}
 
-			// Most productive by time
 			if bestTimeDay == nil || day.Time > bestTimeDay.Time {
 				bestTimeDay = record
 			}
 
-			// Highest output by lines
 			if bestLinesDay == nil || day.Lines > bestLinesDay.Lines {
 				bestLinesDay = record
 			}
@@ -313,6 +281,93 @@ func (c *Calculator) buildPeriod(
 	}
 
 	return result
+}
+
+func (c *Calculator) convertLanguageRows(rows []core.LanguageRow, lifetimeHours map[string]float64, total float64) []APILanguageStats {
+	result := make([]APILanguageStats, 0, len(rows))
+	for _, r := range rows {
+		hours := lifetimeHours[r.Language]
+		proficiency := CalculateProficiency(hours)
+
+		pct := 0.0
+		if total > 0 {
+			pct = (r.TotalTime / total) * 100
+		}
+
+		result = append(result, APILanguageStats{
+			Name:         r.Language,
+			Time:         r.TotalTime,
+			Lines:        r.TotalLines,
+			PercentTotal: pct,
+			Proficiency:  proficiency,
+			HoursTotal:   r.TotalTime / 3600,
+			IsCode:       IsCodeLanguage(r.Language),
+		})
+	}
+	return result
+}
+
+func (c *Calculator) convertProjectRows(rows []core.ProjectRow, projectLangs map[string]map[string]float64, total float64) []APIProjectStats {
+	result := make([]APIProjectStats, 0, len(rows))
+	for _, r := range rows {
+		mainLang := r.MainLanguage
+
+		// If mainLang is not a code language, find the first code language from projectLangs
+		if mainLang == "" || !IsCodeLanguage(mainLang) {
+			if langs, ok := projectLangs[r.Project]; ok {
+				for lang := range langs {
+					if IsCodeLanguage(lang) {
+						mainLang = lang
+						break
+					}
+				}
+			}
+		}
+
+		if mainLang == "" || !IsCodeLanguage(mainLang) {
+			mainLang = "Mixed"
+		}
+
+		pct := 0.0
+		if total > 0 {
+			pct = (r.TotalTime / total) * 100
+		}
+
+		result = append(result, APIProjectStats{
+			Name:         r.Project,
+			Time:         r.TotalTime,
+			Lines:        r.TotalLines,
+			PercentTotal: pct,
+			MainLanguage: mainLang,
+		})
+	}
+	return result
+}
+
+func (c *Calculator) convertEditorRows(rows []core.EditorRow, total float64) []APIEditorStats {
+	result := make([]APIEditorStats, 0, len(rows))
+	for _, r := range rows {
+		pct := 0.0
+		if total > 0 {
+			pct = (r.TotalTime / total) * 100
+		}
+
+		result = append(result, APIEditorStats{
+			Name:         r.Editor,
+			Time:         r.TotalTime,
+			PercentTotal: pct,
+		})
+	}
+	return result
+}
+
+func (c *Calculator) indexSessionsByDay(sessions []core.Session) map[string][]core.Session {
+	index := make(map[string][]core.Session)
+	for _, s := range sessions {
+		day := util.DateString(s.StartTime, c.timezone)
+		index[day] = append(index[day], s)
+	}
+	return index
 }
 
 func (c *Calculator) filterSessions(sessions []core.Session, start, end time.Time) []core.Session {
@@ -607,12 +662,18 @@ func (c *Calculator) calculateRecords(
 	var maxDayTime float64
 	var maxDayDate string
 	var maxDayLines int
+	var maxLines int
+	var maxLinesDate string
 
 	for date, stat := range dayAgg {
 		if stat.Time > maxDayTime {
 			maxDayTime = stat.Time
 			maxDayDate = date
 			maxDayLines = stat.Lines
+		}
+		if stat.Lines > maxLines {
+			maxLines = stat.Lines
+			maxLinesDate = date
 		}
 	}
 
@@ -623,6 +684,16 @@ func (c *Calculator) calculateRecords(
 			Lines:        maxDayLines,
 			SessionCount: len(sessionsByDay[maxDayDate]),
 			Weekday:      util.ParseWeekday(maxDayDate, c.timezone),
+		}
+	}
+
+	if maxLinesDate != "" {
+		records.HighestDailyOutput = DayRecord{
+			Date:         maxLinesDate,
+			Lines:        maxLines,
+			Time:         dayAgg[maxLinesDate].Time,
+			SessionCount: len(sessionsByDay[maxLinesDate]),
+			Weekday:      util.ParseWeekday(maxLinesDate, c.timezone),
 		}
 	}
 
@@ -639,26 +710,6 @@ func (c *Calculator) calculateRecords(
 			Start:    longestSession.StartTime.Format(time.RFC3339),
 			End:      longestSession.EndTime.Format(time.RFC3339),
 			Duration: longestSession.Duration,
-		}
-	}
-
-	var maxLines int
-	var maxLinesDate string
-
-	for date, stat := range dayAgg {
-		if stat.Lines > maxLines {
-			maxLines = stat.Lines
-			maxLinesDate = date
-		}
-	}
-
-	if maxLinesDate != "" {
-		records.HighestDailyOutput = DayRecord{
-			Date:         maxLinesDate,
-			Lines:        maxLines,
-			Time:         dayAgg[maxLinesDate].Time,
-			SessionCount: len(sessionsByDay[maxLinesDate]),
-			Weekday:      util.ParseWeekday(maxLinesDate, c.timezone),
 		}
 	}
 

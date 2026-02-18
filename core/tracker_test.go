@@ -35,6 +35,22 @@ func (m *mockStorage) GetDailySummaries() (map[string]DailySummary, error) {
 	return make(map[string]DailySummary), nil
 }
 
+func (m *mockStorage) GetPeriodSummary(from, to time.Time) (PeriodSummary, error) {
+	return PeriodSummary{}, nil
+}
+
+func (m *mockStorage) GetLanguageSummary(from, to time.Time) ([]LanguageRow, error) {
+	return nil, nil
+}
+
+func (m *mockStorage) GetProjectSummary(from, to time.Time) ([]ProjectRow, error) {
+	return nil, nil
+}
+
+func (m *mockStorage) GetEditorSummary(from, to time.Time) ([]EditorRow, error) {
+	return nil, nil
+}
+
 func (m *mockStorage) Optimize() error {
 	return nil
 }

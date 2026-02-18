@@ -7,91 +7,98 @@ import (
 	"github.com/tduyng/codeme/util"
 )
 
+const (
+	DefaultIdleCap        = 2 * time.Minute
+	DefaultSessionTimeout = 15 * time.Minute
+	DefaultMinSession     = 1 * time.Minute
+)
+
 type SessionManager struct {
 	timeout     time.Duration
 	minDuration time.Duration
+	idleCap     time.Duration
 }
 
 func NewSessionManager(timeout, minDuration time.Duration) *SessionManager {
 	if timeout == 0 {
-		timeout = 15 * time.Minute
+		timeout = DefaultSessionTimeout
 	}
 	if minDuration == 0 {
-		minDuration = 1 * time.Minute
+		minDuration = DefaultMinSession
 	}
 	return &SessionManager{
 		timeout:     timeout,
 		minDuration: minDuration,
+		idleCap:     DefaultIdleCap,
 	}
 }
 
-func (sm *SessionManager) GroupSessions(activities []core.Activity) []core.Session {
+func (sm *SessionManager) GroupAndCalculate(activities []core.Activity) ([]core.Activity, []core.Session) {
 	if len(activities) == 0 {
-		return nil
+		return activities, nil
 	}
+
+	idleCapSeconds := sm.idleCap.Seconds()
+	timeoutSeconds := sm.timeout.Seconds()
+	minSessionSeconds := sm.minDuration.Seconds()
 
 	var sessions []core.Session
-	var current *core.Session
-	var projects, languages util.StringSet
-	var runningDuration float64
+	var sessionStart int
+	var sessionDuration float64
+	projects := util.NewStringSet()
+	languages := util.NewStringSet()
 
-	start := func(a core.Activity) {
-		runningDuration = 0
-		projects = util.NewStringSet()
-		languages = util.NewStringSet()
-		projects.Add(a.Project)
-		if IsValidLanguage(a.Language) {
-			languages.Add(NormalizeLanguage(a.Language))
+	for i := range activities {
+		var gap float64
+		if i < len(activities)-1 {
+			gap = activities[i+1].Timestamp.Sub(activities[i].Timestamp).Seconds()
 		}
 
-		current = &core.Session{
-			ID:        a.ID,
-			StartTime: a.Timestamp,
-			EndTime:   a.Timestamp,
-			IsActive:  false,
-		}
-	}
+		isLastActivity := i == len(activities)-1
+		isSessionEnd := isLastActivity || gap > timeoutSeconds
 
-	finalize := func() {
-		current.Duration = runningDuration
-		current.Projects = projects.ToSortedSlice()
-		current.Languages = languages.ToSortedSlice()
-
-		if current.Duration >= sm.minDuration.Seconds() {
-			sessions = append(sessions, *current)
-		}
-	}
-
-	for _, a := range activities {
-		if current == nil {
-			start(a)
-			runningDuration += a.Duration
-			continue
+		if isSessionEnd {
+			activities[i].Duration = idleCapSeconds
+		} else {
+			activities[i].Duration = gap
 		}
 
-		if a.Timestamp.Sub(current.EndTime) > sm.timeout {
-			finalize()
-			start(a)
-			runningDuration += a.Duration
-			continue
+		sessionDuration += activities[i].Duration
+		projects.Add(activities[i].Project)
+		if IsValidLanguage(activities[i].Language) {
+			languages.Add(NormalizeLanguage(activities[i].Language))
 		}
 
-		current.EndTime = a.Timestamp
-		runningDuration += a.Duration
-		projects.Add(a.Project)
-		if IsValidLanguage(a.Language) {
-			languages.Add(NormalizeLanguage(a.Language))
+		if isSessionEnd {
+			if sessionDuration >= minSessionSeconds {
+				s := core.Session{
+					ID:         activities[sessionStart].ID,
+					StartTime:  activities[sessionStart].Timestamp,
+					EndTime:    activities[i].Timestamp,
+					Duration:   sessionDuration,
+					Projects:   projects.ToSortedSlice(),
+					Languages:  languages.ToSortedSlice(),
+					IsActive:   isLastActivity && i == len(activities)-1,
+					BreakAfter: 0,
+				}
+				sessions = append(sessions, s)
+			}
+			sessionStart = i + 1
+			sessionDuration = 0
+			projects = util.NewStringSet()
+			languages = util.NewStringSet()
 		}
-	}
-
-	if current != nil {
-		finalize()
 	}
 
 	for i := 0; i < len(sessions)-1; i++ {
 		sessions[i].BreakAfter = sessions[i+1].StartTime.Sub(sessions[i].EndTime).Seconds()
 	}
 
+	return activities, sessions
+}
+
+func (sm *SessionManager) GroupSessions(activities []core.Activity) []core.Session {
+	_, sessions := sm.GroupAndCalculate(activities)
 	return sessions
 }
 
