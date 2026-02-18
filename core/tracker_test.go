@@ -35,6 +35,10 @@ func (m *mockStorage) Optimize() error {
 	return nil
 }
 
+func (m *mockStorage) RebuildSummaries() error {
+	return nil
+}
+
 func (m *mockStorage) Close() error {
 	m.closed = true
 	return nil

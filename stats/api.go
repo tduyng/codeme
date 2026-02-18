@@ -11,13 +11,17 @@ import (
 
 type Calculator struct {
 	timezone *time.Location
+	cache    *StatsCache
 }
 
 func NewCalculator(timezone *time.Location) *Calculator {
 	if timezone == nil {
 		timezone = time.UTC
 	}
-	return &Calculator{timezone: timezone}
+	return &Calculator{
+		timezone: timezone,
+		cache:    NewStatsCache(30 * time.Second),
+	}
 }
 
 func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APIStats, error) {
@@ -25,6 +29,12 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 
 	if opts.LoadRecentDays == 0 {
 		opts.LoadRecentDays = 365
+	}
+
+	if cached, ok := c.cache.Get(opts); ok {
+		cached.GeneratedAt = time.Now()
+		cached.Meta.QueryTimeMs = float64(time.Since(startTime).Milliseconds())
+		return cached, nil
 	}
 
 	cutoff := time.Now().AddDate(0, 0, -opts.LoadRecentDays)
@@ -90,7 +100,7 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 
 	queryTime := time.Since(startTime).Seconds() * 1000
 
-	return &APIStats{
+	result := &APIStats{
 		Today:         today,
 		Yesterday:     yesterday,
 		ThisWeek:      thisWeek,
@@ -110,7 +120,11 @@ func (c *Calculator) CalculateAPI(storage core.Storage, opts APIOptions) (*APISt
 			QueryTimeMs:      queryTime,
 			DataWindow:       fmt.Sprintf("last_%d_days", opts.LoadRecentDays),
 		},
-	}, nil
+	}
+
+	c.cache.Set(result)
+
+	return result, nil
 }
 
 func (c *Calculator) calculateDurations(activities []core.Activity) []core.Activity {

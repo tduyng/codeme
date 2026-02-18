@@ -31,5 +31,6 @@ type Storage interface {
 	GetActivitiesSince(time.Time) ([]Activity, error)
 	GetActivityCount() (int, error)
 	Optimize() error
+	RebuildSummaries() error
 	Close() error
 }

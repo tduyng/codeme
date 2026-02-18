@@ -146,6 +146,60 @@ func (s *SQLiteStorage) Optimize() error {
 	return nil
 }
 
+func (s *SQLiteStorage) RebuildSummaries() error {
+	_, err := s.db.Exec(`
+		INSERT OR REPLACE INTO daily_summary
+			(date, total_lines, activity_count, first_activity, last_activity)
+		SELECT
+			date(timestamp, 'unixepoch', 'localtime'),
+			SUM(lines),
+			COUNT(*),
+			MIN(timestamp),
+			MAX(timestamp)
+		FROM activities
+		GROUP BY date(timestamp, 'unixepoch', 'localtime')
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to rebuild daily summary: %w", err)
+	}
+
+	_, err = s.db.Exec(`
+		INSERT OR REPLACE INTO daily_language_summary
+			(date, language, total_lines, file_count)
+		SELECT
+			date(timestamp, 'unixepoch', 'localtime'),
+			language,
+			SUM(lines),
+			COUNT(DISTINCT file)
+		FROM activities
+		GROUP BY date(timestamp, 'unixepoch', 'localtime'), language
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to rebuild language summary: %w", err)
+	}
+
+	_, err = s.db.Exec(`
+		INSERT OR REPLACE INTO daily_project_summary
+			(date, project, total_lines, main_language, file_count)
+		SELECT
+			date(timestamp, 'unixepoch', 'localtime'),
+			project,
+			SUM(lines),
+			(SELECT language FROM activities a2 
+			 WHERE a2.project = activities.project 
+			 AND date(a2.timestamp, 'unixepoch', 'localtime') = date(activities.timestamp, 'unixepoch', 'localtime')
+			 GROUP BY language ORDER BY COUNT(*) DESC LIMIT 1),
+			COUNT(DISTINCT file)
+		FROM activities
+		GROUP BY date(timestamp, 'unixepoch', 'localtime'), project
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to rebuild project summary: %w", err)
+	}
+
+	return nil
+}
+
 func (s *SQLiteStorage) Close() error {
 	if s.saveStmt != nil {
 		s.saveStmt.Close()
@@ -213,6 +267,37 @@ func createSchema(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_timestamp_language ON activities(timestamp, language);
 	CREATE INDEX IF NOT EXISTS idx_timestamp_editor ON activities(timestamp, editor);
 	CREATE INDEX IF NOT EXISTS idx_stats_covering ON activities(timestamp, id, lines, language, project, editor, file, is_write);
+
+	CREATE TABLE IF NOT EXISTS daily_summary (
+		date TEXT PRIMARY KEY,
+		total_time REAL DEFAULT 0,
+		total_lines INTEGER DEFAULT 0,
+		activity_count INTEGER DEFAULT 0,
+		session_count INTEGER DEFAULT 0,
+		first_activity INTEGER,
+		last_activity INTEGER,
+		created_at INTEGER DEFAULT (strftime('%s', 'now')),
+		updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+	);
+
+	CREATE TABLE IF NOT EXISTS daily_language_summary (
+		date TEXT NOT NULL,
+		language TEXT NOT NULL,
+		total_time REAL DEFAULT 0,
+		total_lines INTEGER DEFAULT 0,
+		file_count INTEGER DEFAULT 0,
+		PRIMARY KEY (date, language)
+	);
+
+	CREATE TABLE IF NOT EXISTS daily_project_summary (
+		date TEXT NOT NULL,
+		project TEXT NOT NULL,
+		total_time REAL DEFAULT 0,
+		total_lines INTEGER DEFAULT 0,
+		main_language TEXT,
+		file_count INTEGER DEFAULT 0,
+		PRIMARY KEY (date, project)
+	);
 	`
 
 	_, err := db.Exec(schema)
