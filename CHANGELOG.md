@@ -1,3 +1,32 @@
+## [0.0.6](https://github.com/tduyng/codeme/compare/v0.0.5..v0.0.6) - 2026-02-19
+
+### Features
+
+- Add read-only connection and rebuild-summaries command - ([94f6186](https://github.com/tduyng/codeme/commit/94f61861c735f8c374ffa167c7eb38e054a17aa9))
+- Add summary tables and caching layer - ([7955eaf](https://github.com/tduyng/codeme/commit/7955eafc1dd97f30dfc403a5770c5d18aabce486))
+
+### Bug Fixes
+
+- *(core)* Unify query path and fix resource leaks - ([992f56d](https://github.com/tduyng/codeme/commit/992f56d9c53477528ffd36dde35b347f16552c18))
+- Correct period filtering for most productive day and highest daily output - ([94407a3](https://github.com/tduyng/codeme/commit/94407a3a8601a314ec601eeb1a7b737e1a90d822))
+- Add GetDailySummaries method for future optimization - ([ba4582a](https://github.com/tduyng/codeme/commit/ba4582ae66df16e1276564f9fa9b889098d8b26d))
+- Update summary tables in real-time on SaveActivity - ([00878fb](https://github.com/tduyng/codeme/commit/00878fb80bfd10eebd77828fa8e2481b8689111a))
+
+### Refactor
+
+- Remove unused funcs - ([2ce15d2](https://github.com/tduyng/codeme/commit/2ce15d2ae40cd284063cd148eeb2f4cd99378924))
+
+### Performance
+
+- Replace UUID with timestamp-based ID generation - ([c4ea280](https://github.com/tduyng/codeme/commit/c4ea280db817f7c52e2a6cecc47ddc2fae8aec73))
+- Merge activity loops and add covering index - ([3e94c23](https://github.com/tduyng/codeme/commit/3e94c23209eb36ba8c7ab8df29253878a8cbe29e))
+- Remove redundant sorts and optimize session grouping - ([53e7c58](https://github.com/tduyng/codeme/commit/53e7c588f1b9c3424cb70950c0c3300d3f6cce14))
+
+### Miscellaneous Tasks
+
+- Update README - ([c1ed52b](https://github.com/tduyng/codeme/commit/c1ed52b313f373c2beb8da298661fc57aea61bda))
+- Add uninstall command - ([ce9595d](https://github.com/tduyng/codeme/commit/ce9595d5c79f3163e11d1966ff450a70bfa3c7e1))
+- Make installation more clear - ([7602af8](https://github.com/tduyng/codeme/commit/7602af8839432ac649de14cb1726de7973c62655))
 ## [0.0.5](https://github.com/tduyng/codeme/compare/v0.0.4..v0.0.5) - 2026-02-15
 
 ### Miscellaneous Tasks
