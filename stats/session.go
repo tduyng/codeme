@@ -97,11 +97,6 @@ func (sm *SessionManager) GroupAndCalculate(activities []core.Activity) ([]core.
 	return activities, sessions
 }
 
-func (sm *SessionManager) GroupSessions(activities []core.Activity) []core.Session {
-	_, sessions := sm.GroupAndCalculate(activities)
-	return sessions
-}
-
 func ConvertSessionsToAPI(sessions []core.Session) []APISession {
 	result := make([]APISession, len(sessions))
 

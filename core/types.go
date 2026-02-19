@@ -62,7 +62,6 @@ type Storage interface {
 	SaveActivity(Activity) error
 	GetActivitiesSince(time.Time) ([]Activity, error)
 	GetActivityCount() (int, error)
-	GetDailySummaries() (map[string]DailySummary, error)
 	GetPeriodSummary(from, to time.Time) (PeriodSummary, error)
 	GetLanguageSummary(from, to time.Time) ([]LanguageRow, error)
 	GetProjectSummary(from, to time.Time) ([]ProjectRow, error)
